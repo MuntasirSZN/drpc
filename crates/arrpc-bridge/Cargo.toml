@@ -1,0 +1,18 @@
+[package]
+name = "arrpc-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrpc-core = { path = "../arrpc-core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+futures = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+parking_lot = { workspace = true }
+anyhow.workspace = true
+
+[features]
+default = []

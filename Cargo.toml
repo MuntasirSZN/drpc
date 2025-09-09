@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/arrpc-bin",
+  "crates/arrpc-core",
+  "crates/arrpc-ipc",
+  "crates/arrpc-ws",
+  "crates/arrpc-process",
+  "crates/arrpc-bridge",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["MuntasirSZN <muntasir.joypurhat@gmail.com>"]
+edition = "2021"
+description = "Open Discord RPC server for atypical setups in Rust"
+readme = "README.md"
+repository = "https://github.com/MuntasirSZN/arrpc-rs"
+license = "MIT"
+keywords = ["discord", "rpc", "websocket"]
+
+[workspace.dependencies]
+anyhow = "1"
+axum = { version = "0.7", features = ["ws"] }
+futures = "0.3"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[workspace.features]
+default = ["ipc", "ws"]
+ipc = []
+ws = []
+bridge = []
+process-scanning = []

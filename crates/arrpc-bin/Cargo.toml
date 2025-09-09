@@ -1,0 +1,26 @@
+[package]
+name = "arrpc-bin"
+version = "0.1.0"
+edition.workspace = true
+
+[[bin]]
+name = "arrpc"
+path = "src/main.rs"
+
+[dependencies]
+arrpc-ipc = { optional = true, path = "../arrpc-ipc" }
+arrpc-ws = { optional = true, path = "../arrpc-ws" }
+arrpc-bridge = { optional = true, path = "../arrpc-bridge" }
+arrpc-core = { path = "../arrpc-core" }
+arrpc-process = { optional = true, path = "../arrpc-process" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow.workspace = true
+
+[features]
+default = ["ws", "ipc", "bridge", "process-scanning"]
+ipc = ["dep:arrpc-ipc"]
+ws = ["dep:arrpc-ws"]
+bridge = ["dep:arrpc-bridge"]
+process-scanning = ["dep:arrpc-process"]
