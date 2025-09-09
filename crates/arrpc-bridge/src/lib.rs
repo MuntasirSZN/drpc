@@ -5,7 +5,7 @@ use axum::{
     routing::get,
     Router,
 };
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -45,7 +45,8 @@ impl Bridge {
 }
 
 struct BridgeState {
-    activities: RwLock<HashMap<String, serde_json::Value>>, // socket_id -> activity json
+    activities: RwLock<HashMap<String, serde_json::Value>>, // socket_id -> activity json                                                        //
+    #[allow(dead_code)] // for now
     bus: EventBus,
     clients: RwLock<Vec<tokio::sync::mpsc::UnboundedSender<String>>>,
 }
@@ -71,14 +72,18 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<BridgeState>) {
         .collect();
     for (sid, act) in snapshot {
         let msg = serde_json::json!({"socketId": sid, "activity": act});
-        if socket.send(Message::Text(msg.to_string())).await.is_err() {
+        if socket
+            .send(Message::Text(msg.to_string().into()))
+            .await
+            .is_err()
+        {
             return;
         }
     }
     loop {
         tokio::select! {
             Some(Ok(msg)) = socket.next() => { if matches!(msg, Message::Close(_)) { break; } }
-            Some(out) = rx.recv() => { if socket.send(Message::Text(out)).await.is_err() { break; } }
+            Some(out) = rx.recv() => { if socket.send(Message::Text(out.into())).await.is_err() { break; } }
             else => break,
         }
     }

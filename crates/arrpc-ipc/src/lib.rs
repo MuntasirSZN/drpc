@@ -15,6 +15,7 @@ pub enum IpcServerError {
 
 pub struct IpcServer {
     path: String,
+    #[allow(dead_code)] // for now
     bus: EventBus,
 }
 

@@ -1,5 +1,8 @@
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    arrpc_core::rustls::default_provider()
+        .install_default()
+        .expect("crypto provider already set");
     init_tracing();
     let bus = arrpc_core::EventBus::new();
     #[cfg(feature = "ws")]

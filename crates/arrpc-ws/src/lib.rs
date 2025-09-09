@@ -92,7 +92,7 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
     };
     let json = serde_json::to_string(&frame).unwrap();
     if socket
-        .send(axum::extract::ws::Message::Text(json))
+        .send(axum::extract::ws::Message::Text(json.into()))
         .await
         .is_err()
     {
@@ -116,7 +116,11 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
                         if let Ok(activity) = serde_json::from_value::<Activity>(args.clone()) {
                             let norm = activity.normalize();
                             let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
-                            if socket.send(Message::Text(out.to_string())).await.is_err() {
+                            if socket
+                                .send(Message::Text(out.to_string().into()))
+                                .await
+                                .is_err()
+                            {
                                 break;
                             }
                             bus.publish(EventKind::ActivityUpdate {
@@ -128,7 +132,11 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
                     }
                 }
                 let out = json!({"cmd":"DISPATCH","evt":"ACK","data":val});
-                if socket.send(Message::Text(out.to_string())).await.is_err() {
+                if socket
+                    .send(Message::Text(out.to_string().into()))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }

@@ -7,3 +7,4 @@ pub use detectables::*;
 pub use event::*;
 pub use frame::*;
 pub use protocol::*;
+pub use rustls::crypto::aws_lc_rs as rustls;

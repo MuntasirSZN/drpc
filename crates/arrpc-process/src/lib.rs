@@ -29,6 +29,7 @@ pub struct Scanner<B: ProcessBackend + 'static> {
     backend: B,
     detectables: Detectables,
     bus: EventBus,
+    #[allow(dead_code)] // for now
     seen: Arc<RwLock<HashSet<u32>>>,
 }
 
