@@ -33,7 +33,7 @@ impl Detectables {
     }
 }
 
-pub fn load_detectables(force_refresh: bool, ttl_hours: u64) -> Detectables {
+pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Detectables {
     let path = detectables_path();
     let mut need_fetch = force_refresh || !path.exists();
     if !need_fetch {
@@ -49,8 +49,26 @@ pub fn load_detectables(force_refresh: bool, ttl_hours: u64) -> Detectables {
     }
     let mut list: Vec<DetectableEntry> = Vec::new();
     if need_fetch {
-        debug!(?path, "(placeholder) would fetch remote detectables");
-        // placeholder: fallback to embedded empty list
+        #[cfg(feature = "network")]
+        {
+            debug!("fetching detectables from network");
+            match fetch_remote().await {
+                Ok(remote) => {
+                    list = remote;
+                    if let Some(parent) = path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if let Ok(json) = serde_json::to_string_pretty(&list) {
+                        let _ = std::fs::write(&path, json);
+                    }
+                }
+                Err(e) => warn!(error=?e, "failed fetch; using fallback"),
+            }
+        }
+        #[cfg(not(feature = "network"))]
+        {
+            debug!("network feature disabled; using empty detectables");
+        }
     } else if let Ok(data) = std::fs::read_to_string(&path) {
         match serde_json::from_str::<Vec<DetectableEntry>>(&data) {
             Ok(v) => list = v,
@@ -77,4 +95,25 @@ fn detectables_path() -> PathBuf {
     p.push(".arrpc");
     p.push("detectables.json");
     p
+}
+
+#[cfg(feature = "network")]
+async fn fetch_remote() -> Result<Vec<DetectableEntry>, reqwest::Error> {
+    let url = "https://discord.com/api/v9/applications/detectable";
+    let resp = reqwest::get(url).await?;
+    if !resp.status().is_success() {
+        return Ok(Vec::new());
+    }
+    let val: serde_json::Value = resp.json().await?;
+    if let Some(arr) = val.as_array() {
+        let mut out = Vec::new();
+        for v in arr {
+            if let Ok(entry) = serde_json::from_value::<DetectableEntry>(v.clone()) {
+                out.push(entry);
+            }
+        }
+        Ok(out)
+    } else {
+        Ok(Vec::new())
+    }
 }

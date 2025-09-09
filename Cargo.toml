@@ -31,6 +31,7 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1", features = ["serde", "v4"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 [workspace.features]
 default = ["ipc", "ws"]
@@ -38,3 +39,4 @@ ipc = []
 ws = []
 bridge = []
 process-scanning = []
+network = []

@@ -172,7 +172,9 @@ impl Activity {
         }
         // instance flag -> flags bit 0
         if let Some(inst) = self.instance {
-            if inst { self.flags = Some(self.flags.unwrap_or(0) | 1); }
+            if inst {
+                self.flags = Some(self.flags.unwrap_or(0) | 1);
+            }
         }
         self
     }

@@ -67,7 +67,11 @@ async fn ws_handler(
     if q.v.unwrap_or(1) != 1 {
         return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
-    if let Some(enc) = &q.encoding { if enc.to_lowercase() != "json" { return axum::http::StatusCode::BAD_REQUEST.into_response(); } }
+    if let Some(enc) = &q.encoding {
+        if enc.to_lowercase() != "json" {
+            return axum::http::StatusCode::BAD_REQUEST.into_response();
+        }
+    }
     if q.client_id.is_none() {
         return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
@@ -107,7 +111,22 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
                     .and_then(|c| c.as_str())
                     .unwrap_or("")
                     .to_uppercase();
-                if maybe_cmd == "SET_ACTIVITY" { if let Some(args) = val.get("args").and_then(|a| a.get("activity")) { if let Ok(activity) = serde_json::from_value::<Activity>(args.clone()) { let norm = activity.normalize(); let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}}); if socket.send(Message::Text(out.to_string())).await.is_err() { break; } bus.publish(EventKind::ActivityUpdate { socket_id: socket_id.clone(), payload: serde_json::to_value(norm).unwrap_or(json!({})) }); continue; } } }
+                if maybe_cmd == "SET_ACTIVITY" {
+                    if let Some(args) = val.get("args").and_then(|a| a.get("activity")) {
+                        if let Ok(activity) = serde_json::from_value::<Activity>(args.clone()) {
+                            let norm = activity.normalize();
+                            let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
+                            if socket.send(Message::Text(out.to_string())).await.is_err() {
+                                break;
+                            }
+                            bus.publish(EventKind::ActivityUpdate {
+                                socket_id: socket_id.clone(),
+                                payload: serde_json::to_value(norm).unwrap_or(json!({})),
+                            });
+                            continue;
+                        }
+                    }
+                }
                 let out = json!({"cmd":"DISPATCH","evt":"ACK","data":val});
                 if socket.send(Message::Text(out.to_string())).await.is_err() {
                     break;

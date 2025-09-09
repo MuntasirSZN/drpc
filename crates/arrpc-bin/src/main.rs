@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     }
     #[cfg(feature = "process-scanning")]
     {
-        let detectables = arrpc_core::load_detectables(false, 24);
+        let detectables = arrpc_core::load_detectables_async(false, 24).await;
         let backend = arrpc_process::LinuxBackend; // placeholder
         let scanner = arrpc_process::Scanner::new(backend, detectables, bus.clone());
         scanner.spawn();

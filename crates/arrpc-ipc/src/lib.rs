@@ -90,13 +90,21 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
                         IpcOp::Frame => {
                             if let Some(cmd) = frame.body.get("cmd").and_then(|c| c.as_str()) {
                                 if cmd.eq_ignore_ascii_case("SET_ACTIVITY") {
-                                    if let Some(args) = frame.body.get("args").and_then(|a| a.get("activity")) {
-                                        if let Ok(activity) = serde_json::from_value::<Activity>(args.clone()) {
+                                    if let Some(args) =
+                                        frame.body.get("args").and_then(|a| a.get("activity"))
+                                    {
+                                        if let Ok(activity) =
+                                            serde_json::from_value::<Activity>(args.clone())
+                                        {
                                             let norm = activity.normalize();
                                             let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
                                             let buf = encode_frame(IpcOp::Frame, &out);
                                             let _ = stream.write_all(&buf).await;
-                                            bus.publish(EventKind::ActivityUpdate { socket_id: socket_id.clone(), payload: serde_json::to_value(norm).unwrap_or(json!({})) });
+                                            bus.publish(EventKind::ActivityUpdate {
+                                                socket_id: socket_id.clone(),
+                                                payload: serde_json::to_value(norm)
+                                                    .unwrap_or(json!({})),
+                                            });
                                         }
                                     }
                                 }
@@ -149,7 +157,13 @@ fn scan_and_bind_ipc() -> Result<(tokio::net::UnixListener, String), IpcServerEr
 
 fn candidate_dirs() -> Vec<String> {
     let mut v = Vec::new();
-    for key in ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"] { if let Ok(val) = std::env::var(key) { if !val.is_empty() { v.push(val); } } }
+    for key in ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"] {
+        if let Ok(val) = std::env::var(key) {
+            if !val.is_empty() {
+                v.push(val);
+            }
+        }
+    }
     v.push("/tmp".into());
     v
 }
