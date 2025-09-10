@@ -131,6 +131,8 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
                         }
                     }
                 }
+                if maybe_cmd == "CONNECTIONS_CALLBACK" { let out = json!({"cmd":"DISPATCH","evt":"ERROR","data":{"code":1000}}); let _=socket.send(Message::Text(out.to_string().into())).await; continue; }
+                if matches!(maybe_cmd.as_str(), "INVITE_BROWSER"|"GUILD_TEMPLATE_BROWSER"|"DEEP_LINK") { let out = json!({"cmd":"DISPATCH","evt":"ACK","data":{"ok":true}}); let _=socket.send(Message::Text(out.to_string().into())).await; continue; }
                 let out = json!({"cmd":"DISPATCH","evt":"ACK","data":val});
                 if socket
                     .send(Message::Text(out.to_string().into()))
