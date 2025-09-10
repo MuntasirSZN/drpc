@@ -124,6 +124,7 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
     bus.publish(EventKind::Clear { socket_id });
 }
 
+#[cfg(unix)]
 fn scan_and_bind_ipc() -> Result<(tokio::net::UnixListener, String), IpcServerError> {
     use std::path::PathBuf;
     let dirs = candidate_dirs();
@@ -156,6 +157,7 @@ fn scan_and_bind_ipc() -> Result<(tokio::net::UnixListener, String), IpcServerEr
     Err(std::io::Error::new(std::io::ErrorKind::AddrNotAvailable, "no ipc path").into())
 }
 
+#[cfg(unix)]
 fn candidate_dirs() -> Vec<String> {
     let mut v = Vec::new();
     for key in ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"] {
@@ -168,6 +170,24 @@ fn candidate_dirs() -> Vec<String> {
     v.push("/tmp".into());
     v
 }
+
+// Windows named pipe scaffold (placeholder implementation)
+#[cfg(windows)]
+fn scan_and_bind_ipc() -> Result<(tokio::net::windows::named_pipe::NamedPipeServer, String), IpcServerError> {
+    use tokio::net::windows::named_pipe::ServerOptions;
+    // Try discord-ipc-0..9 named pipes; pick first available
+    for i in 0..10 {
+        let name = format!("\\\\?\\pipe\\discord-ipc-{}", i);
+        match ServerOptions::new().first_pipe_instance(true).create(&name) {
+            Ok(server) => return Ok((server, name)),
+            Err(_) => continue,
+        }
+    }
+    Err(std::io::Error::new(std::io::ErrorKind::AddrNotAvailable, "no named pipe available").into())
+}
+
+#[cfg(windows)]
+fn candidate_dirs() -> Vec<String> { Vec::new() }
 
 #[cfg(test)]
 mod tests {

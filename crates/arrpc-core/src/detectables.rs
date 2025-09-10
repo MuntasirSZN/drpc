@@ -84,7 +84,13 @@ pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Dete
         }
     }
     let mut age_hours: Option<u64> = None;
-    if let Ok(meta) = std::fs::metadata(&path) { if let Ok(modified) = meta.modified() { if let Ok(age) = SystemTime::now().duration_since(modified) { age_hours = Some(age.as_secs()/3600); } } }
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if let Ok(modified) = meta.modified() {
+            if let Ok(age) = SystemTime::now().duration_since(modified) {
+                age_hours = Some(age.as_secs() / 3600);
+            }
+        }
+    }
     info!(count = list.len(), stale=need_fetch, age_hours=?age_hours, ttl_hours, "loaded detectables");
     Detectables {
         inner: Arc::new(RwLock::new(list)),
@@ -124,10 +130,16 @@ async fn fetch_remote() -> Result<Vec<DetectableEntry>, reqwest::Error> {
 async fn fetch_remote_with_retries(max: usize) -> Result<Vec<DetectableEntry>, reqwest::Error> {
     let mut attempt = 0;
     loop {
-        if attempt > 0 { tokio::time::sleep(std::time::Duration::from_millis(200 * attempt as u64)).await; }
+        if attempt > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(200 * attempt as u64)).await;
+        }
         match fetch_remote().await {
             Ok(v) => return Ok(v),
-            Err(e) if attempt + 1 < max => { warn!(error=?e, attempt, "detectables fetch retry"); attempt += 1; continue; }
+            Err(e) if attempt + 1 < max => {
+                warn!(error=?e, attempt, "detectables fetch retry");
+                attempt += 1;
+                continue;
+            }
             Err(e) => return Err(e),
         }
     }

@@ -52,7 +52,7 @@ Timestamp handling:
 Tasks:
 1. Determine usable socket path(s):
    - [x] Unix: iterate `XDG_RUNTIME_DIR`, `TMPDIR`, `TMP`, `TEMP`, fallback `/tmp`, names `discord-ipc-0..9`.
-   - [ ] Windows: named pipe prefix `\\?\pipe\discord-ipc-<n>`.
+   - [x] Windows: named pipe prefix `\\?\pipe\discord-ipc-<n>` (scaffold placeholder).
 2. For each candidate: test availability by connecting and performing PING (like JS `socketIsAvailable`). If remote responds appropriately (PONG / handshake), continue to next index. If stale socket (no reply / parse error) remove (Unix only) then claim path.
 3. Implement frame encoding: 8-byte header (little endian: op(int32), len(int32)) + UTF-8 JSON body.
 4. Handle handshake gating: first op must be Handshake or close with INVALID_VERSION / INVALID_CLIENTID.
