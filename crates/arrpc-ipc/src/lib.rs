@@ -173,7 +173,8 @@ fn candidate_dirs() -> Vec<String> {
 
 // Windows named pipe scaffold (placeholder implementation)
 #[cfg(windows)]
-fn scan_and_bind_ipc() -> Result<(tokio::net::windows::named_pipe::NamedPipeServer, String), IpcServerError> {
+fn scan_and_bind_ipc(
+) -> Result<(tokio::net::windows::named_pipe::NamedPipeServer, String), IpcServerError> {
     use tokio::net::windows::named_pipe::ServerOptions;
     // Try discord-ipc-0..9 named pipes; pick first available
     for i in 0..10 {
@@ -183,11 +184,17 @@ fn scan_and_bind_ipc() -> Result<(tokio::net::windows::named_pipe::NamedPipeServ
             Err(_) => continue,
         }
     }
-    Err(std::io::Error::new(std::io::ErrorKind::AddrNotAvailable, "no named pipe available").into())
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AddrNotAvailable,
+        "no named pipe available",
+    )
+    .into())
 }
 
 #[cfg(windows)]
-fn candidate_dirs() -> Vec<String> { Vec::new() }
+fn candidate_dirs() -> Vec<String> {
+    Vec::new()
+}
 
 #[cfg(test)]
 mod tests {
