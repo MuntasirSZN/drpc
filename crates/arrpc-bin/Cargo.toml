@@ -8,19 +8,22 @@ name = "arrpc"
 path = "src/main.rs"
 
 [dependencies]
-arrpc-ipc = { optional = true, path = "../arrpc-ipc" }
-arrpc-ws = { optional = true, path = "../arrpc-ws" }
+anyhow.workspace = true
 arrpc-bridge = { optional = true, path = "../arrpc-bridge" }
 arrpc-core = { path = "../arrpc-core" }
+arrpc-ipc = { optional = true, path = "../arrpc-ipc" }
 arrpc-process = { optional = true, path = "../arrpc-process" }
+arrpc-ws = { optional = true, path = "../arrpc-ws" }
+clap = { workspace = true }
 tokio = { workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-anyhow.workspace = true
+serde = { workspace = true }
 
 [features]
-default = ["ws", "ipc", "bridge", "process-scanning"]
-ipc = ["dep:arrpc-ipc"]
-ws = ["dep:arrpc-ws"]
 bridge = ["dep:arrpc-bridge"]
+default = ["bridge", "ipc", "process-scanning", "ws"]
+ipc = ["dep:arrpc-ipc"]
 process-scanning = ["dep:arrpc-process"]
+ws = ["dep:arrpc-ws"]

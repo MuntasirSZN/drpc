@@ -2,11 +2,11 @@
 resolver = "3"
 members = [
   "crates/arrpc-bin",
+  "crates/arrpc-bridge",
   "crates/arrpc-core",
   "crates/arrpc-ipc",
-  "crates/arrpc-ws",
   "crates/arrpc-process",
-  "crates/arrpc-bridge",
+  "crates/arrpc-ws",
 ]
 
 [workspace.package]
@@ -22,17 +22,27 @@ keywords = ["discord", "rpc", "websocket"]
 [workspace.dependencies]
 anyhow = "1"
 axum = { version = "0.8", features = ["ws"] }
+clap = { version = "4", features = ["derive"] }
 futures = "0.3"
 parking_lot = "0.12"
+reqwest = { version = "0.12", default-features = false, features = [
+  "http2",
+  "json",
+  "rustls-tls-native-roots-no-provider",
+  "socks",
+  "system-proxy",
+] }
+rustls = { version = "0.23.31", default-features = false, features = [
+  "aws_lc_rs",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1", features = ["full"] }
+toml = "0.9"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1", features = ["serde", "v4"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots-no-provider", "system-proxy", "http2", "socks"], default-features = false }
-rustls = { version = "0.23.31", default-features = false, features = ["aws_lc_rs"] }
 
 [workspace.features]
 default = ["ipc", "ws"]

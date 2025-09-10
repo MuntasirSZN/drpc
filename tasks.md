@@ -5,20 +5,22 @@ Comprehensive plan for rewriting `@OpenAsar/arrpc` in pure Rust using the Axum e
 ---
 
 ## 0. Objectives
+
 - [ ] Pure Rust implementation (no Node dependency) of: IPC transport, WebSocket transport, bridge WebSocket, process scanning, activity dispatch, invite/template/deep-link command handling.
 - [x] Use Axum (with Tokio) for all HTTP/WebSocket surfaces; implement IPC via Unix Domain Sockets / Windows Named Pipes.
 - [ ] Structured logging (use `tracing` + env filter); `ARRPC_DEBUG=1` => debug level, otherwise info/warn minimal.
 - [x] Generate / refresh `detectables.json` (renamed conceptually to `detectables.json`) once on startup if missing or stale; stored in `~/.arrpc/detectables.json` (create directory if needed). Support manual refresh flag. (placeholder fetch)
 - [ ] Fix known issues from changelog & implicit bugs (see Section 11) and make behavior deterministic.
-- [ ] Provide clean API surface (library crate) and binary (`arrpc`) with feature flags.
+- [x] Provide clean API surface (library crate) and binary (`arrpc`) with feature flags.
 - [ ] Ensure compatibility with existing web bridge mods (same JSON payload structure) and clients using the original IPC protocol.
-- [ ] Add tests for protocol framing, activity lifecycle, process matcher, detectables loader.
+- [ ] Add tests for protocol framing, activity lifecycle, process matcher, detectables loader. (partial framing + ws integration)
 
 ---
 
 ## 1. High-Level Architecture
 
 Crate workspace structure:
+
 - [x] `arrpc-core` (library): shared models, protocol enums, activity dispatcher, detectables DB, process matcher.
 - [x] `arrpc-ipc` (feature `ipc`): IPC server implementation (Unix/Windows) replicating Discord IPC framing.
 - [x] `arrpc-ws` (feature `ws`): RPC WebSocket server (ports 6463–6472 with origin + encoding validation; only JSON now).
@@ -27,8 +29,9 @@ Crate workspace structure:
 - [x] `arrpc-bin` (binary): CLI combining enabled features; config + runtime orchestration.
 
 Runtime orchestration:
+
 - [ ] Supervisor spawns enabled subsystems asynchronously; channels (Tokio broadcast + mpsc) propagate ActivityEvents.
-- [ ] Activity normalization module sets timestamps, rewrites buttons, enforces JSON structure.
+- [x] Activity normalization module sets timestamps, rewrites buttons, enforces JSON structure.
 - [x] Event router fans out: (a) Bridge broadcast (all connected websockets); (b) Pending callbacks (invite/template/deep-link); (c) internal watchers. (bridge broadcasting implemented; callbacks pending)
 
 ---
@@ -36,6 +39,7 @@ Runtime orchestration:
 ## 2. Data Models / Protocol
 
 Rust structs (serde-enabled) for frames:
+
 - [x] `IpcOp` enum (Handshake, Frame, Close, Ping, Pong) mapping numeric codes (0–4).
 - [x] `RpcCommand` enum: DISPATCH, SET_ACTIVITY, INVITE_BROWSER, GUILD_TEMPLATE_BROWSER, DEEP_LINK, CONNECTIONS_CALLBACK.
 - [x] `IncomingFrame { cmd, args, nonce }` and `OutgoingFrame { cmd, data, evt, nonce }`.
@@ -44,12 +48,15 @@ Rust structs (serde-enabled) for frames:
 - [ ] Bridge message: `{ activity, pid, socketId }` as pass-through.
 
 Timestamp handling:
+
 - [x] Detect seconds vs milliseconds (heuristic: if digits length < current_ms_length - 2 → multiply by 1000).
 
 ---
 
 ## 3. IPC Transport (Discord-Compatible)
+
 Tasks:
+
 1. Determine usable socket path(s):
    - [x] Unix: iterate `XDG_RUNTIME_DIR`, `TMPDIR`, `TMP`, `TEMP`, fallback `/tmp`, names `discord-ipc-0..9`.
    - [x] Windows: named pipe prefix `\\?\pipe\discord-ipc-<n>` (scaffold placeholder).
@@ -65,8 +72,10 @@ Tasks:
 ---
 
 ## 4. WebSocket RPC Server
+
 Using Axum + `axum::extract::WebSocketUpgrade` + `tokio_tungstenite` behind the scenes.
 Tasks:
+
 1. Port scan 6463–6472; choose first free (bind test). Log chosen.
 2. Accept only origins in whitelist: `https://discord.com`, `https://ptb.discord.com`, `https://canary.discord.com` unless debug flag to relax.
 3. Query params: `v`, `encoding`, `client_id`; reject unsupported version (`!=1`) or encoding (anything except json).
@@ -78,7 +87,9 @@ Tasks:
 ---
 
 ## 5. Bridge Server (Web Clients)
+
 Tasks:
+
 1. Axum route upgrading on configurable port (default 1337 / env `ARRPC_BRIDGE_PORT`).
 2. Keep last message per `socketId`; upon new connection replay non-null activities.
 3. Broadcast using a shared `broadcast::Receiver<ActivityMessage>`; serialization exactly matches Node messages.
@@ -88,7 +99,9 @@ Tasks:
 ---
 
 ## 6. Process Scanning
+
 Tasks:
+
 1. OS abstraction trait `ProcessBackend` with `async fn list(&self) -> Vec<ProcessInfo>` (pid, exe_path, args?).
 2. Linux: replicate `/proc/<pid>/cmdline` logic; robust error handling (skip unreadable). Consider caching exe resolution.
 3. Windows: use `CreateToolhelp32Snapshot` (WinAPI) or WMI fallback; parse command line if feasible (optional for MVP) — replicating current wmic CSV approach but replacing with native API for performance.
@@ -106,7 +119,9 @@ Tasks:
 ---
 
 ## 7. Detectables Database Management
+
 Tasks:
+
 1. Determine path: `~/.arrpc/detectables.json` (use `std::env::home_dir()` crate for home; create directory).
 2. On startup: if file missing OR `--refresh-detectables` flag OR file older than configurable TTL (default 7 days) → fetch from `https://discord.com/api/v9/applications/detectable`.
 3. Use `reqwest` (feature gated: `network`) else fallback to embedded snapshot (generated at build time via `build.rs`).
@@ -119,7 +134,9 @@ Tasks:
 ---
 
 ## 8. Command Handling Logic
+
 Parity features to implement:
+
 1. `SET_ACTIVITY`:
    - Interpret `activity`, `pid`.
    - Handle clearing (null) and send confirmation with original structure (name:"" when returning, matching Node) and include `application_id` + `type:0`.
@@ -135,7 +152,9 @@ Parity features to implement:
 ---
 
 ## 9. Configuration & CLI
+
 CLI (using `clap`):
+
 - Flags: `--no-process-scanning`, `--bridge-port <port>`, `--refresh-detectables`, `--detectables-ttl <hours>`, `--log-format <pretty|json>`, `--config <path>`.
 - Environment variable mapping: `ARRPC_NO_PROCESS_SCANNING`, `ARRPC_BRIDGE_PORT`, `ARRPC_DEBUG`.
 - Config file (optional) at `~/.arrpc/config.toml` overriding defaults; CLI has highest precedence.
@@ -143,7 +162,9 @@ CLI (using `clap`):
 ---
 
 ## 10. Logging & Observability
+
 Tasks:
+
 1. Use `tracing` + `tracing-subscriber` with env filter (default info; if `ARRPC_DEBUG` then debug).
 2. Provide structured JSON logging option.
 3. Add span context per connection (socketId) for grouping.
@@ -152,7 +173,9 @@ Tasks:
 ---
 
 ## 11. Known Issues / Fixes to Preserve
+
 From changelog & code reading:
+
 - [x] Accept blank activities (name may be empty) and still respond (v3.0.0 note).
 - [ ] Clear activities on disconnect (implemented; must replicate).
 - [x] Proper READY packet config (v3.4.0 rewrite) — copy exact structure.
@@ -166,13 +189,16 @@ From changelog & code reading:
 ---
 
 ## 12. Testing Strategy
+
 Unit Tests:
+
 - [x] Frame codec encode/decode & error paths (invalid op, truncated payload, handshake ordering).
 - [ ] Activity normalization (buttons mapping, timestamp conversion, flags calculation).
 - [ ] Process matcher (synthetic dataset to ensure variant matching works).
 - [ ] Detectables loader (stale vs fresh logic; invalid JSON handling fallback).
 
 Integration Tests (where feasible):
+
 - [ ] Start server with IPC + WS + Bridge (random ports); connect mock client -> perform handshake -> send SET_ACTIVITY -> receive confirmation & bridge broadcast.
 - [ ] Process scanning mock backend injecting processes to produce activities then removal triggers clears.
 
@@ -181,7 +207,8 @@ Optional (future CI): property test frame parser (proptest), benchmarking proces
 ---
 
 ## 13. Security & Robustness
-- [ ] Validate all client-provided JSON fields; cap payload size (e.g. 64KB) to avoid memory abuse.
+
+- [x] Validate all client-provided JSON fields; cap payload size (e.g. 64KB) to avoid memory abuse. (simple size limit)
 - [x] Origin checks on WS RPC; Bridge is local only (bind 127.0.0.1 explicitly).
 - [ ] Graceful shutdown (Ctrl+C) triggers broadcast of clears, flush logs.
 - [ ] Panic hooks -> structured error log, non-zero exit.
@@ -190,6 +217,7 @@ Optional (future CI): property test frame parser (proptest), benchmarking proces
 ---
 
 ## 14. Performance Considerations
+
 - [ ] Pre-allocate serde `String` buffers for frequent frames; consider `simd-json` feature for high-throughput (optional).
 - [x] Process scan: diff approach — store previous `HashSet` of matched ids; break early when all executables matched. (initial diff logic)
 - [ ] Use `parking_lot` locks or lock-free channels for high frequency events (activities) if contention observed.
@@ -197,7 +225,9 @@ Optional (future CI): property test frame parser (proptest), benchmarking proces
 ---
 
 ## 15. Example & Client Updates
+
 Tasks:
+
 - [ ] Port `examples/bridge_mod.js` unchanged (compat layer: JSON wire format identical).
 - [ ] Provide updated README usage: `arrpc` binary; environment variables; process scanning toggle.
 - [ ] Document how to embed library in Electron-like environments (Rust binary separate; JS mod same).
@@ -206,7 +236,9 @@ Tasks:
 ---
 
 ## 16. Build, Distribution & Packaging
+
 Tasks:
+
 - [x] Provide `Cargo.toml` workspace and features matrix.
 - [ ] Cross-compilation notes (Windows, Linux, macOS) — use GitHub Actions (future) with release artifacts.
 - [ ] Optional `--print-socket-paths` CLI to debug IPC discovery.
@@ -215,7 +247,9 @@ Tasks:
 ---
 
 ## 17. Migration Plan (Phased)
+
 Phase 1: Core & Models
+
 1. Define protocol structs + serde (no IO yet).
 2. Implement codec + tests.
 
@@ -248,6 +282,7 @@ Phase 9: Stretch & Polish
 ---
 
 ## 18. Stretch Goals / Backlog
+
 - [ ] Implement Erlpack / ETF encoding (use existing crates or implement minimal subset) with content negotiation.
 - [ ] HTTP transport (REST) mirroring Discord local RPC (for completeness).
 - [ ] macOS process scanning backend.
@@ -259,6 +294,7 @@ Phase 9: Stretch & Polish
 ---
 
 ## 19. Open Questions
+
 - [ ] Should we support multiple simultaneous IPC sockets (like Discord does) or only first free? (Current JS chooses one; keep that for now.)
 - [ ] Retain exact mock user ID & avatar? (Yes for compatibility; document rationale.)
 - [ ] TTL for detectables default 7 days or 24 hours? (Decide: use 24h for freshness unless offline; configurable.)
@@ -267,6 +303,7 @@ Phase 9: Stretch & Polish
 ---
 
 ## 20. Definition of Done (Parity)
+
 - [ ] Running `arrpc` reproduces behavior: RPC-enabled app connects (IPC or WS) → sets activity → web bridge mod shows status in Discord Web with assets resolving externally.
 - [ ] All commands respond identically (structure + success/error semantics) to JS version for supported set.
 - [ ] Clearing on disconnect, periodic process scanning updates present, detectables file created at first run in `~/.arrpc/`.
@@ -276,6 +313,7 @@ Phase 9: Stretch & Polish
 ---
 
 ## 21. Immediate Next Steps
+
 1. [x] Initialize `Cargo.toml` workspace + crates skeleton per Section 1.
 2. [x] Implement protocol models + frame codec tests.
 3. [ ] Create detectables loader with embedded fallback snapshot (export existing JSON as seed).

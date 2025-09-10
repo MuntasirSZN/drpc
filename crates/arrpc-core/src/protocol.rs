@@ -176,6 +176,19 @@ impl Activity {
                 self.flags = Some(self.flags.unwrap_or(0) | 1);
             }
         }
+        if let Some(btns) = self.buttons.as_ref() {
+            let labels: Vec<String> = btns.iter().map(|b| b.label.clone()).collect();
+            let urls: Vec<String> = btns.iter().map(|b| b.url.clone()).collect();
+            let meta = serde_json::json!({ "button_urls": urls });
+            let mut obj = serde_json::to_value(&self).unwrap_or(serde_json::json!({}));
+            if let Some(map) = obj.as_object_mut() {
+                map.insert("metadata".into(), meta);
+                map.insert("buttons".into(), serde_json::to_value(labels).unwrap());
+            }
+            if let Ok(re) = serde_json::from_value::<Activity>(obj) {
+                self = re;
+            }
+        }
         self
     }
 }

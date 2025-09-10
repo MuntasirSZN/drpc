@@ -62,6 +62,10 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
             debug!(error=?e, "client closed mid-body");
             break;
         }
+        if len > 64 * 1024 {
+            debug!("payload too large; closing");
+            break;
+        }
         let mut full = Vec::from(header);
         full.extend_from_slice(&body);
         match decode_frame(&full) {

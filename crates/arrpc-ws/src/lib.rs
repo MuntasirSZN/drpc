@@ -101,6 +101,10 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
     while let Some(Ok(msg)) = socket.next().await {
         match msg {
             Message::Text(txt) => {
+                if txt.len() > 64 * 1024 {
+                    let _ = socket.send(Message::Close(None)).await;
+                    break;
+                }
                 debug!(%txt, "recv ws");
                 // Placeholder dispatch parsing
                 let val: serde_json::Value =

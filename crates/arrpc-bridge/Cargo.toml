@@ -4,15 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow.workspace = true
 arrpc-core = { path = "../arrpc-core" }
-tokio = { workspace = true }
 axum = { workspace = true }
 futures = { workspace = true }
-serde_json = { workspace = true }
-tracing = { workspace = true }
-serde = { workspace = true }
 parking_lot = { workspace = true }
-anyhow.workspace = true
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 default = []
