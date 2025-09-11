@@ -83,10 +83,129 @@ impl<B: ProcessBackend + 'static> Scanner<B> {
     }
 }
 
-fn match_process<'a>(
-    _p: &ProcessInfo,
-    _list: &'a [DetectableEntry],
-) -> Option<&'a DetectableEntry> {
-    // placeholder (always none)
+fn match_process<'a>(p: &ProcessInfo, list: &'a [DetectableEntry]) -> Option<&'a DetectableEntry> {
+    let exe_base = base_lower(&p.exe);
+    let cmd_lower = p.cmdline.to_lowercase();
+    // Skip common launchers explicitly
+    const LAUNCHERS: &[&str] = &[
+        "steam",
+        "steam.exe",
+        "steamwebhelper",
+        "battle.net",
+        "epicgameslauncher",
+        "riotclientservices",
+        "launcher",
+    ];
+    if LAUNCHERS.contains(&exe_base.as_str()) {
+        return None;
+    }
+    // Try direct executable name match first, skipping detectable launchers
+    for d in list {
+        for exe in &d.executables {
+            if exe.is_launcher {
+                continue;
+            }
+            let det_base = base_lower(&exe.name);
+            if names_match(&exe_base, &det_base) {
+                return Some(d);
+            }
+        }
+    }
+    // Heuristic: Java-based processes — match on JAR or app name in cmdline
+    if matches!(
+        exe_base.as_str(),
+        "java" | "javaw" | "java.exe" | "javaw.exe"
+    ) {
+        for d in list {
+            // prefer executable names if present
+            for exe in &d.executables {
+                if exe.is_launcher {
+                    continue;
+                }
+                let det_base = base_lower(&exe.name);
+                if cmd_lower.contains(&det_base) || cmd_lower.contains(&strip_ext(&det_base)) {
+                    return Some(d);
+                }
+            }
+            // fallback: look for detectable name in cmdline
+            let dn = d.name.to_lowercase();
+            if cmd_lower.contains(&dn) {
+                return Some(d);
+            }
+        }
+    }
     None
+}
+
+fn base_lower(s: &str) -> String {
+    std::path::Path::new(s)
+        .file_name()
+        .and_then(|o| o.to_str())
+        .unwrap_or(s)
+        .to_lowercase()
+}
+
+fn strip_ext(name: &str) -> String {
+    match name.rsplit_once('.') {
+        Some((stem, _)) => stem.to_string(),
+        None => name.to_string(),
+    }
+}
+
+fn names_match(a: &str, b: &str) -> bool {
+    a == b || strip_ext(a) == b || a == strip_ext(b) || strip_ext(a) == strip_ext(b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn det(name: &str, exe: &str, is_launcher: bool) -> DetectableEntry {
+        DetectableEntry {
+            id: None,
+            name: name.into(),
+            executables: vec![drpc_core::DetectableExecutable {
+                name: exe.into(),
+                is_launcher,
+            }],
+        }
+    }
+
+    #[test]
+    fn match_by_exe_basename() {
+        let list = vec![det("CoolGame", "coolgame", false)];
+        let p = ProcessInfo {
+            pid: 1,
+            exe: "/usr/bin/coolgame".into(),
+            cmdline: "coolgame".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().name, "CoolGame");
+    }
+
+    #[test]
+    fn launcher_is_skipped() {
+        let list = vec![det("Launcher", "launcher", true)];
+        let p = ProcessInfo {
+            pid: 2,
+            exe: "/opt/launcher".into(),
+            cmdline: "launcher".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_none());
+    }
+
+    #[test]
+    fn java_jar_name_in_cmdline() {
+        let list = vec![det("JarGame", "JarGame.jar", false)];
+        let p = ProcessInfo {
+            pid: 3,
+            exe: "/usr/bin/java".into(),
+            cmdline: "java -jar /home/user/JarGame.jar".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().name, "JarGame");
+    }
 }

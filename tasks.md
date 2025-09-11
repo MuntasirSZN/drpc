@@ -46,7 +46,7 @@ Acceptance
 
 - [x] Detectables loader to ~/.drpc/detectables.json with TTL and optional refresh; async network fetch with retries; logs age/ttl.
 - [x] Process scanning crate scaffold with backend trait; Linux placeholder backend; diff-and-publish loop.
-- [ ] Matching algorithm parity (path variants, launcher skips, java arg rules) and tests.
+- [x] Matching algorithm parity (path variants, launcher skips, java arg rules) and tests.
 
 Acceptance
 
