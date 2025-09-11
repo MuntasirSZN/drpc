@@ -1,12 +1,12 @@
 [package]
-name = "arrpc-bridge"
+name = "drpc-bridge"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
-arrpc-core = { path = "../arrpc-core" }
 axum = { workspace = true }
+drpc-core = { path = "../drpc-core" }
 futures = { workspace = true }
 parking_lot = { workspace = true }
 serde_json = { workspace = true }

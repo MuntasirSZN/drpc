@@ -4,8 +4,8 @@ use tokio_tungstenite::connect_async;
 #[tokio::test]
 async fn ws_ready_and_set_activity() {
     // Start a temporary server instance by invoking library run function.
-    let bus = arrpc_core::EventBus::new();
-    let port = arrpc_ws::run_ws_server(bus).await.expect("start ws");
+    let bus = drpc_core::EventBus::new();
+    let port = drpc_ws::run_ws_server(bus).await.expect("start ws");
     let (mut ws, _resp) = connect_async(format!(
         "ws://127.0.0.1:{}/?v=1&encoding=json&client_id=123",
         port

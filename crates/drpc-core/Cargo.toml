@@ -1,15 +1,19 @@
 [package]
-name = "arrpc-ipc"
+name = "drpc-core"
 version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-arrpc-core = { path = "../arrpc-core" }
+parking_lot = { workspace = true }
+reqwest = { workspace = true }
+rustls.workspace = true
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio.workspace = true
 tracing = { workspace = true }
 uuid = { workspace = true }
 
 [features]
 default = []
+network = []

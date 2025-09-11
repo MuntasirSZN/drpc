@@ -1,10 +1,10 @@
-use arrpc_core::{EventBus, EventKind};
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
     Router,
 };
+use drpc_core::{EventBus, EventKind};
 use futures::StreamExt;
 use parking_lot::RwLock;
 use std::collections::HashMap;

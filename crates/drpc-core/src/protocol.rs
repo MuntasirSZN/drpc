@@ -79,7 +79,7 @@ impl Default for MockUser {
     fn default() -> Self {
         Self {
             id: "961950517370097704".into(),
-            username: "arrpc".into(),
+            username: "drpc".into(),
             discriminator: "0000".into(),
             avatar: "a_39e73cb4db97d204c41e5328c85dc993".into(),
             bot: true,

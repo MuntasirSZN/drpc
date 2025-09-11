@@ -1,12 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/arrpc-bin",
-  "crates/arrpc-bridge",
-  "crates/arrpc-core",
-  "crates/arrpc-ipc",
-  "crates/arrpc-process",
-  "crates/arrpc-ws",
+  "crates/drpc",
+  "crates/drpc-bridge",
+  "crates/drpc-core",
+  "crates/drpc-ipc",
+  "crates/drpc-process",
+  "crates/drpc-ws",
 ]
 
 [workspace.package]
@@ -15,7 +15,7 @@ authors = ["MuntasirSZN <muntasir.joypurhat@gmail.com>"]
 edition = "2021"
 description = "Open Discord RPC server for atypical setups in Rust"
 readme = "README.md"
-repository = "https://github.com/MuntasirSZN/arrpc-rs"
+repository = "https://github.com/MuntasirSZN/drpc-rs"
 license = "MIT"
 keywords = ["discord", "rpc", "websocket"]
 

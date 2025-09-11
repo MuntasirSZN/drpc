@@ -1,4 +1,4 @@
-use arrpc_core::{
+use drpc_core::{
     decode_frame, encode_frame, Activity, EventBus, EventKind, IpcOp, MockUser, ReadyConfig,
     ReadyEvent,
 };
@@ -208,7 +208,7 @@ mod tests {
     #[tokio::test]
     async fn handshake_and_ready() {
         let test_dir = format!(
-            "/tmp/arrpc-test-{}",
+            "/tmp/drpc-test-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -218,7 +218,7 @@ mod tests {
         unsafe {
             std::env::set_var("XDG_RUNTIME_DIR", &test_dir);
         }
-        let server = IpcServer::bind_with_bus(arrpc_core::EventBus::new())
+        let server = IpcServer::bind_with_bus(drpc_core::EventBus::new())
             .await
             .expect("bind");
         let path = server.path();

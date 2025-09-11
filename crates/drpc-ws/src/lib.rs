@@ -1,6 +1,3 @@
-use arrpc_core::{
-    Activity, EventBus, EventKind, MockUser, OutgoingFrame, ReadyConfig, ReadyEvent, RpcCommand,
-};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -10,6 +7,9 @@ use axum::{
     response::IntoResponse,
     routing::get,
     Router,
+};
+use drpc_core::{
+    Activity, EventBus, EventKind, MockUser, OutgoingFrame, ReadyConfig, ReadyEvent, RpcCommand,
 };
 use futures::StreamExt;
 use serde::Deserialize;
@@ -55,7 +55,7 @@ async fn ws_handler(
 ) -> impl IntoResponse {
     if let Some(orig) = headers.get("origin") {
         let o = orig.to_str().unwrap_or("");
-        if std::env::var("ARRPC_DEBUG").ok().as_deref() != Some("1")
+        if std::env::var("DRPC_DEBUG").ok().as_deref() != Some("1")
             && !matches!(
                 o,
                 "https://discord.com" | "https://ptb.discord.com" | "https://canary.discord.com"

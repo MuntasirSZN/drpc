@@ -83,92 +83,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
 
 [[package]]
-name = "arrpc-bin"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrpc-bridge",
- "arrpc-core",
- "arrpc-ipc",
- "arrpc-process",
- "arrpc-ws",
- "clap",
- "serde",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "arrpc-bridge"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrpc-core",
- "axum",
- "futures",
- "parking_lot",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "arrpc-core"
-version = "0.1.0"
-dependencies = [
- "parking_lot",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "arrpc-ipc"
-version = "0.1.0"
-dependencies = [
- "arrpc-core",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "arrpc-process"
-version = "0.1.0"
-dependencies = [
- "arrpc-core",
- "async-trait",
- "parking_lot",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "arrpc-ws"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrpc-core",
- "axum",
- "futures",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.27.0",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -502,6 +416,92 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "drpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "drpc-bridge",
+ "drpc-core",
+ "drpc-ipc",
+ "drpc-process",
+ "drpc-ws",
+ "serde",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "drpc-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "drpc-core",
+ "futures",
+ "parking_lot",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "drpc-core"
+version = "0.1.0"
+dependencies = [
+ "parking_lot",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "drpc-ipc"
+version = "0.1.0"
+dependencies = [
+ "drpc-core",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "drpc-process"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "drpc-core",
+ "parking_lot",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "drpc-ws"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "drpc-core",
+ "futures",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.27.0",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1415,9 +1415,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.4"
+version = "0.103.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a17884ae0c1b773f1ccd2bd4a8c72f16da897310a98b0e84bf349ad5ead92fc"
+checksum = "b5a37813727b78798e53c2bec3f5e8fe12a6d6f8389bf9ca7802add4c9905ad8"
 dependencies = [
  "aws-lc-rs",
  "ring",

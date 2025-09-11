@@ -1,4 +1,4 @@
-use arrpc_core::{Activity, DetectableEntry, Detectables, EventBus, EventKind};
+use drpc_core::{Activity, DetectableEntry, Detectables, EventBus, EventKind};
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

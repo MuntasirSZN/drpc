@@ -100,7 +100,7 @@ pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Dete
 fn detectables_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let mut p = PathBuf::from(home);
-    p.push(".arrpc");
+    p.push(".drpc");
     p.push("detectables.json");
     p
 }

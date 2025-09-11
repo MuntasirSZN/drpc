@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "arrpc", version, about = "arRPC Rust server")]
+#[command(name = "drpc", version, about = "dRPC Rust server")]
 struct Cli {
     #[arg(long)]
     bridge_port: Option<u16>,
@@ -26,23 +26,23 @@ struct FileConfig {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    arrpc_core::rustls::default_provider()
+    drpc_core::rustls::default_provider()
         .install_default()
         .expect("crypto provider already set");
     let cli = Cli::parse();
     let file_cfg = load_config(cli.config.clone())?;
     init_tracing(&cli);
-    let bus = arrpc_core::EventBus::new();
+    let bus = drpc_core::EventBus::new();
     #[cfg(feature = "ws")]
     {
-        match arrpc_ws::run_ws_server(bus.clone()).await {
+        match drpc_ws::run_ws_server(bus.clone()).await {
             Ok(port) => tracing::info!(port, "started ws server"),
             Err(e) => tracing::error!(error=?e, "failed to start ws server"),
         }
     }
     #[cfg(feature = "ipc")]
     {
-        match arrpc_ipc::IpcServer::bind_with_bus(bus.clone()).await {
+        match drpc_ipc::IpcServer::bind_with_bus(bus.clone()).await {
             Ok(server) => tracing::info!(path=%server.path(), "started ipc server"),
             Err(e) => tracing::error!(error=?e, "failed to start ipc server"),
         }
@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "bridge")]
     {
         let bridge_port = cli.bridge_port.or(file_cfg.bridge_port);
-        match arrpc_bridge::Bridge::run(bus.clone(), bridge_port).await {
+        match drpc_bridge::Bridge::run(bus.clone(), bridge_port).await {
             Ok(b) => tracing::info!(port = b.port(), "started bridge server"),
             Err(e) => tracing::error!(error=?e, "failed to start bridge server"),
         }
@@ -58,16 +58,15 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "process-scanning")]
     {
         if !cli.no_process_scanning
-            && std::env::var("ARRPC_NO_PROCESS_SCANNING").ok().as_deref() != Some("1")
+            && std::env::var("DRPC_NO_PROCESS_SCANNING").ok().as_deref() != Some("1")
         {
             let ttl = cli
                 .detectables_ttl
                 .or(file_cfg.detectables_ttl)
                 .unwrap_or(24);
-            let detectables =
-                arrpc_core::load_detectables_async(cli.refresh_detectables, ttl).await;
-            let backend = arrpc_process::LinuxBackend; // placeholder
-            let scanner = arrpc_process::Scanner::new(backend, detectables, bus.clone());
+            let detectables = drpc_core::load_detectables_async(cli.refresh_detectables, ttl).await;
+            let backend = drpc_process::LinuxBackend; // placeholder
+            let scanner = drpc_process::Scanner::new(backend, detectables, bus.clone());
             scanner.spawn();
             tracing::info!("process scanner started");
         } else {
@@ -80,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn init_tracing(cli: &Cli) {
     use tracing_subscriber::{fmt, EnvFilter};
-    let level = if std::env::var("ARRPC_DEBUG").ok().as_deref() == Some("1") {
+    let level = if std::env::var("DRPC_DEBUG").ok().as_deref() == Some("1") {
         "debug"
     } else {
         "info"
@@ -98,7 +97,7 @@ fn load_config(path: Option<PathBuf>) -> anyhow::Result<FileConfig> {
     let p = path.unwrap_or_else(|| {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let mut dir = PathBuf::from(home);
-        dir.push(".arrpc");
+        dir.push(".drpc");
         dir.push("config.toml");
         dir
     });
