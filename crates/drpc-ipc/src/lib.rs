@@ -21,24 +21,71 @@ pub struct IpcServer {
 
 impl IpcServer {
     pub async fn bind_with_bus(bus: EventBus) -> Result<Self, IpcServerError> {
-        let (listener, path) = scan_and_bind_ipc()?;
-        info!(%path, "IPC listening");
-        let bus_clone = bus.clone();
-        tokio::spawn(async move {
-            loop {
-                match listener.accept().await {
-                    Ok((stream, addr)) => {
-                        debug!(?addr, "ipc client connected");
-                        let bus = bus_clone.clone();
-                        tokio::spawn(handle_client(stream, bus));
-                    }
-                    Err(e) => {
-                        warn!(error=?e, "accept failed");
-                        break;
+        let path: String;
+        #[cfg(unix)]
+        {
+            let (listener, p) = scan_and_bind_ipc()?;
+            path = p;
+            info!(%path, "IPC listening");
+            let bus_clone = bus.clone();
+            tokio::spawn(async move {
+                loop {
+                    match listener.accept().await {
+                        Ok((stream, addr)) => {
+                            debug!(?addr, "ipc client connected");
+                            let bus = bus_clone.clone();
+                            tokio::spawn(handle_client(stream, bus));
+                        }
+                        Err(e) => {
+                            warn!(error=?e, "accept failed");
+                            break;
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+        #[cfg(windows)]
+        {
+            use tokio::net::windows::named_pipe::ServerOptions;
+            let (first_server, name) = scan_and_bind_ipc()?;
+            path = name.clone();
+            info!(path=%name, "IPC listening (Windows named pipe)");
+            let bus_clone = bus.clone();
+            tokio::spawn(async move {
+                // Accept loop: connect initial instance, then create subsequent instances
+                let mut next: Option<tokio::net::windows::named_pipe::NamedPipeServer> =
+                    Some(first_server);
+                loop {
+                    let server = match next.take() {
+                        Some(s) => s,
+                        None => match ServerOptions::new()
+                            .first_pipe_instance(false)
+                            .create(&name)
+                        {
+                            Ok(s) => s,
+                            Err(e) => {
+                                warn!(error=?e, name, "failed to create pipe instance");
+                                break;
+                            }
+                        },
+                    };
+                    match server.connect().await {
+                        Ok(()) => {
+                            debug!(path=%name, "ipc client connected (win)");
+                            let bus = bus_clone.clone();
+                            tokio::spawn(handle_client_windows(server, bus));
+                            // continue loop with a fresh instance next iteration
+                            next = None;
+                        }
+                        Err(e) => {
+                            warn!(error=?e, "pipe connect failed");
+                            // reuse by waiting for another connection
+                            next = Some(server);
+                        }
+                    }
+                }
+            });
+        }
         Ok(Self { path, bus })
     }
 
@@ -48,6 +95,93 @@ impl IpcServer {
 }
 
 async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
+    let mut handshook = false;
+    let socket_id = uuid::Uuid::new_v4().to_string();
+    let span = info_span!("ipc_connection", %socket_id);
+    let _enter = span.enter();
+    loop {
+        let mut header = [0u8; 8];
+        if let Err(e) = stream.read_exact(&mut header).await {
+            debug!(error=?e, "client closed");
+            break;
+        }
+        let len = i32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+        let mut body = vec![0u8; len];
+        if let Err(e) = stream.read_exact(&mut body).await {
+            debug!(error=?e, "client closed mid-body");
+            break;
+        }
+        if len > 64 * 1024 {
+            debug!("payload too large; closing");
+            break;
+        }
+        let mut full = Vec::from(header);
+        full.extend_from_slice(&body);
+        match decode_frame(&full) {
+            Ok(frame) => {
+                if !handshook {
+                    if frame.op != IpcOp::Handshake {
+                        debug!("expected handshake first");
+                        break;
+                    }
+                    handshook = true;
+                    debug!("handshake accepted");
+                    // respond with READY DISPATCH full payload
+                    let ready_data = ReadyEvent {
+                        config: ReadyConfig::default(),
+                        user: MockUser::default(),
+                    };
+                    let ready = json!({"cmd":"DISPATCH","evt":"READY","data": ready_data});
+                    let buf = encode_frame(IpcOp::Frame, &ready);
+                    let _ = stream.write_all(&buf).await;
+                } else {
+                    debug!(op=?frame.op, body=?frame.body, "frame");
+                    match frame.op {
+                        IpcOp::Ping => {
+                            let buf = encode_frame(IpcOp::Pong, &json!({}));
+                            let _ = stream.write_all(&buf).await;
+                        }
+                        IpcOp::Frame => {
+                            if let Some(cmd) = frame.body.get("cmd").and_then(|c| c.as_str()) {
+                                if cmd.eq_ignore_ascii_case("SET_ACTIVITY") {
+                                    if let Some(args) =
+                                        frame.body.get("args").and_then(|a| a.get("activity"))
+                                    {
+                                        if let Ok(activity) =
+                                            serde_json::from_value::<Activity>(args.clone())
+                                        {
+                                            let norm = activity.normalize();
+                                            let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
+                                            let buf = encode_frame(IpcOp::Frame, &out);
+                                            let _ = stream.write_all(&buf).await;
+                                            bus.publish(EventKind::ActivityUpdate {
+                                                socket_id: socket_id.clone(),
+                                                payload: serde_json::to_value(norm)
+                                                    .unwrap_or(json!({})),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(e) => {
+                debug!(error=?e, "decode error");
+                break;
+            }
+        }
+    }
+    bus.publish(EventKind::Clear { socket_id });
+}
+
+#[cfg(windows)]
+async fn handle_client_windows(
+    mut stream: tokio::net::windows::named_pipe::NamedPipeServer,
+    bus: EventBus,
+) {
     let mut handshook = false;
     let socket_id = uuid::Uuid::new_v4().to_string();
     let span = info_span!("ipc_connection", %socket_id);

@@ -99,7 +99,6 @@ Acceptance
 - [x] Activity normalization test (buttons metadata present).
 - [x] WS integration test (READY then ACTIVITY_UPDATE).
 - [x] IPC integration test (handshake, SET_ACTIVITY).
-- [ ] Detectables loader test (TTL, parse fallback).
 - [x] Detectables loader test (TTL, parse fallback).
 - [ ] Process matcher tests.
 
@@ -111,7 +110,7 @@ Acceptance
 
 ## M8. Cross-Platform & Packaging
 
-- [ ] Windows named pipe server accept/read/write parity with Unix.
+- [x] Windows named pipe server accept/read/write parity with Unix.
 - [ ] macOS/Linux/Windows build guidance (CI later).
 - [x] Optional --print-socket-paths for debug.
 
