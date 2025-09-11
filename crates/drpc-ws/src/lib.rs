@@ -14,7 +14,7 @@ use drpc_core::{
 use futures::StreamExt;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, info_span, warn};
 
 pub async fn run_ws_server(bus: EventBus) -> anyhow::Result<u16> {
     let port = pick_port().await?;
@@ -80,6 +80,8 @@ async fn ws_handler(
 
 async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
     let socket_id = uuid::Uuid::new_v4().to_string();
+    let span = info_span!("ws_connection", %socket_id);
+    let _enter = span.enter();
     let ready = ReadyEvent {
         config: ReadyConfig::default(),
         user: MockUser::default(),

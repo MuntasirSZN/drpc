@@ -156,6 +156,8 @@ pub struct Activity {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flags: Option<u32>,
     // Additional passthrough fields tolerated
+    #[serde(flatten, default)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Activity {
@@ -180,14 +182,11 @@ impl Activity {
             let labels: Vec<String> = btns.iter().map(|b| b.label.clone()).collect();
             let urls: Vec<String> = btns.iter().map(|b| b.url.clone()).collect();
             let meta = serde_json::json!({ "button_urls": urls });
-            let mut obj = serde_json::to_value(&self).unwrap_or(serde_json::json!({}));
-            if let Some(map) = obj.as_object_mut() {
-                map.insert("metadata".into(), meta);
-                map.insert("buttons".into(), serde_json::to_value(labels).unwrap());
-            }
-            if let Ok(re) = serde_json::from_value::<Activity>(obj) {
-                self = re;
-            }
+            self.extra.insert("metadata".into(), meta);
+            self.extra
+                .insert("buttons".into(), serde_json::to_value(labels).unwrap());
+            // Clear typed buttons so wire format uses label list
+            self.buttons = None;
         }
         self
     }

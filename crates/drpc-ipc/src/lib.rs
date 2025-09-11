@@ -5,7 +5,7 @@ use drpc_core::{
 use serde_json::json;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, info_span, warn};
 
 #[derive(Debug, Error)]
 pub enum IpcServerError {
@@ -50,6 +50,8 @@ impl IpcServer {
 async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
     let mut handshook = false;
     let socket_id = uuid::Uuid::new_v4().to_string();
+    let span = info_span!("ipc_connection", %socket_id);
+    let _enter = span.enter();
     loop {
         let mut header = [0u8; 8];
         if let Err(e) = stream.read_exact(&mut header).await {
@@ -238,5 +240,68 @@ mod tests {
         let frame = decode_frame(&full).unwrap();
         assert_eq!(frame.op as i32, IpcOp::Frame as i32);
         assert!(frame.body.get("evt").and_then(|e| e.as_str()).unwrap_or("") == "READY");
+    }
+
+    #[tokio::test]
+    async fn handshake_then_set_activity() {
+        let test_dir = format!(
+            "/tmp/drpc-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        std::fs::create_dir_all(&test_dir).unwrap();
+        unsafe {
+            std::env::set_var("XDG_RUNTIME_DIR", &test_dir);
+        }
+        let server = IpcServer::bind_with_bus(drpc_core::EventBus::new())
+            .await
+            .expect("bind");
+        let path = server.path();
+        let mut client = tokio::net::UnixStream::connect(path)
+            .await
+            .expect("connect");
+        // Handshake
+        let hs = serde_json::json!({"v":1,"client_id":"123"});
+        let buf = encode_frame(IpcOp::Handshake, &hs);
+        client.write_all(&buf).await.unwrap();
+        // Read READY
+        let mut header = [0u8; 8];
+        client.read_exact(&mut header).await.unwrap();
+        let len = i32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+        let mut body = vec![0u8; len];
+        client.read_exact(&mut body).await.unwrap();
+        // Send SET_ACTIVITY frame
+        let set = serde_json::json!({
+            "cmd":"SET_ACTIVITY",
+            "args": {"activity": {"name": "TestGame"}}
+        });
+        let buf = encode_frame(IpcOp::Frame, &set);
+        client.write_all(&buf).await.unwrap();
+        // Read ACTIVITY_UPDATE
+        let mut header2 = [0u8; 8];
+        client.read_exact(&mut header2).await.unwrap();
+        let len2 = i32::from_le_bytes(header2[4..8].try_into().unwrap()) as usize;
+        let mut body2 = vec![0u8; len2];
+        client.read_exact(&mut body2).await.unwrap();
+        let mut full2 = Vec::from(header2);
+        full2.extend_from_slice(&body2);
+        let frame2 = decode_frame(&full2).unwrap();
+        assert_eq!(frame2.op as i32, IpcOp::Frame as i32);
+        let evt = frame2
+            .body
+            .get("evt")
+            .and_then(|e| e.as_str())
+            .unwrap_or("");
+        assert_eq!(evt, "ACTIVITY_UPDATE");
+        let name = frame2
+            .body
+            .get("data")
+            .and_then(|d| d.get("activity"))
+            .and_then(|a| a.get("name"))
+            .and_then(|n| n.as_str())
+            .unwrap_or("");
+        assert_eq!(name, "TestGame");
     }
 }

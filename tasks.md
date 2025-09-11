@@ -60,7 +60,7 @@ Acceptance
 - [x] SET_ACTIVITY: normalize timestamps (s→ms), map instance→flags bit0, map buttons→metadata.button_urls + label list; emit ACTIVITY_UPDATE.
 - [x] CONNECTIONS_CALLBACK: respond { evt: ERROR, data: { code: 1000 } }.
 - [x] INVITE_BROWSER/GUILD_TEMPLATE_BROWSER/DEEP_LINK: placeholder ACK, extensible for callbacks.
-- [ ] CLEAR activity on transport disconnect and persist per-socket registry.
+- [x] CLEAR activity on transport disconnect and persist per-socket registry.
 
 Acceptance
 
@@ -84,8 +84,8 @@ Acceptance
 
 - [x] Origin checks for WS; Bridge bound to localhost.
 - [x] Payload caps (64 KiB) with close.
-- [ ] Connection spans keyed by socketId for logs.
-- [ ] Graceful shutdown: broadcast CLEAR for all active sockets.
+- [x] Connection spans keyed by socketId for logs.
+- [x] Graceful shutdown: broadcast CLEAR for all active sockets.
 
 Acceptance
 
@@ -98,8 +98,9 @@ Acceptance
 - [x] Core codec tests (round-trip, invalid op, truncated).
 - [x] Activity normalization test (buttons metadata present).
 - [x] WS integration test (READY then ACTIVITY_UPDATE).
-- [ ] IPC integration test (handshake, SET_ACTIVITY).
+- [x] IPC integration test (handshake, SET_ACTIVITY).
 - [ ] Detectables loader test (TTL, parse fallback).
+- [x] Detectables loader test (TTL, parse fallback).
 - [ ] Process matcher tests.
 
 Acceptance
@@ -112,7 +113,7 @@ Acceptance
 
 - [ ] Windows named pipe server accept/read/write parity with Unix.
 - [ ] macOS/Linux/Windows build guidance (CI later).
-- [ ] Optional --print-socket-paths for debug.
+- [x] Optional --print-socket-paths for debug.
 
 ---
 

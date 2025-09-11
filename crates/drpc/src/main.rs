@@ -16,6 +16,8 @@ struct Cli {
     log_format: String,
     #[arg(long)]
     config: Option<PathBuf>,
+    #[arg(long)]
+    print_socket_paths: bool,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -33,6 +35,25 @@ async fn main() -> anyhow::Result<()> {
     let file_cfg = load_config(cli.config.clone())?;
     init_tracing(&cli);
     let bus = drpc_core::EventBus::new();
+    // Maintain an in-memory registry of active socket activities for graceful shutdown
+    let registry = drpc_core::ActivityRegistry::new();
+    {
+        let bus_sub = bus.clone();
+        let registry_clone = registry.clone();
+        tokio::spawn(async move {
+            let mut rx = bus_sub.subscribe();
+            while let Some(evt) = rx.recv().await {
+                match evt {
+                    drpc_core::EventKind::ActivityUpdate { socket_id, payload } => {
+                        registry_clone.set(socket_id, payload);
+                    }
+                    drpc_core::EventKind::Clear { socket_id } => {
+                        registry_clone.clear(&socket_id);
+                    }
+                }
+            }
+        });
+    }
     #[cfg(feature = "ws")]
     {
         match drpc_ws::run_ws_server(bus.clone()).await {
@@ -43,7 +64,12 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "ipc")]
     {
         match drpc_ipc::IpcServer::bind_with_bus(bus.clone()).await {
-            Ok(server) => tracing::info!(path=%server.path(), "started ipc server"),
+            Ok(server) => {
+                tracing::info!(path=%server.path(), "started ipc server");
+                if cli.print_socket_paths {
+                    println!("{}", server.path());
+                }
+            }
             Err(e) => tracing::error!(error=?e, "failed to start ipc server"),
         }
     }
@@ -74,6 +100,12 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     tokio::signal::ctrl_c().await.expect("install ctrl+c");
+    tracing::info!("shutdown signal received; broadcasting CLEAR to active sockets");
+    for (socket_id, _activity) in registry.non_null() {
+        bus.publish(drpc_core::EventKind::Clear { socket_id });
+    }
+    // Give subscribers a brief moment to flush messages
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     Ok(())
 }
 

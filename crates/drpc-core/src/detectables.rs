@@ -51,18 +51,22 @@ pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Dete
     if need_fetch {
         #[cfg(feature = "network")]
         {
-            debug!("fetching detectables from network");
-            match fetch_remote_with_retries(3).await {
-                Ok(remote) => {
-                    list = remote;
-                    if let Some(parent) = path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
+            if std::env::var("DRPC_OFFLINE").ok().as_deref() == Some("1") {
+                debug!("offline mode; skipping network fetch; using empty detectables");
+            } else {
+                debug!("fetching detectables from network");
+                match fetch_remote_with_retries(3).await {
+                    Ok(remote) => {
+                        list = remote;
+                        if let Some(parent) = path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        if let Ok(json) = serde_json::to_string_pretty(&list) {
+                            let _ = std::fs::write(&path, json);
+                        }
                     }
-                    if let Ok(json) = serde_json::to_string_pretty(&list) {
-                        let _ = std::fs::write(&path, json);
-                    }
+                    Err(e) => warn!(error=?e, "failed fetch; using fallback"),
                 }
-                Err(e) => warn!(error=?e, "failed fetch; using fallback"),
             }
         }
         #[cfg(not(feature = "network"))]
