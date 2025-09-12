@@ -28,7 +28,7 @@ struct FileConfig {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    drpc_core::rustls::default_provider()
+    rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("crypto provider already set");
     let cli = Cli::parse();

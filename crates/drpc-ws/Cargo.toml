@@ -11,10 +11,8 @@ futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-tokio-tungstenite = { version = "0.27", optional = true, features = ["rustls-tls-native-roots"] }
 tracing = { workspace = true }
 uuid = { workspace = true }
 
-[features]
-default = []
-test-ws = ["tokio-tungstenite"]
+[dev-dependencies]
+tokio-tungstenite = { version = "0.27", features = ["rustls-tls-native-roots"] }

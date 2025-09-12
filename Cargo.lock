@@ -429,6 +429,7 @@ dependencies = [
  "drpc-ipc",
  "drpc-process",
  "drpc-ws",
+ "rustls",
  "serde",
  "tokio",
  "toml",
@@ -456,7 +457,6 @@ version = "0.1.0"
 dependencies = [
  "parking_lot",
  "reqwest",
- "rustls",
  "serde",
  "serde_json",
  "thiserror",
@@ -1765,7 +1765,11 @@ checksum = "489a59b6730eda1b0171fcfda8b121f4bee2b35cba8645ca35c5f7ba3eb736c1"
 dependencies = [
  "futures-util",
  "log",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-pki-types",
  "tokio",
+ "tokio-rustls",
  "tungstenite 0.27.0",
 ]
 
@@ -1977,6 +1981,8 @@ dependencies = [
  "httparse",
  "log",
  "rand",
+ "rustls",
+ "rustls-pki-types",
  "sha1",
  "thiserror",
  "utf-8",
