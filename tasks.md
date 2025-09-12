@@ -111,7 +111,7 @@ Acceptance
 ## M8. Cross-Platform & Packaging
 
 - [x] Windows named pipe server accept/read/write parity with Unix.
-- [ ] macOS/Linux/Windows build guidance (CI later).
+- [x] macOS/Linux/Windows build guidance (CI later).
 - [x] Optional --print-socket-paths for debug.
 
 ---

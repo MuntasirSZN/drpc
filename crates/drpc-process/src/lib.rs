@@ -208,4 +208,45 @@ mod tests {
         assert!(m.is_some());
         assert_eq!(m.unwrap().name, "JarGame");
     }
+
+    #[test]
+    fn extension_mismatch_still_matches() {
+        // coolgame.exe vs coolgame
+        let list = vec![det("CoolGame", "coolgame.exe", false)];
+        let p = ProcessInfo {
+            pid: 4,
+            exe: "coolgame".into(),
+            cmdline: "coolgame".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().name, "CoolGame");
+    }
+
+    #[test]
+    fn launcher_executable_name_skipped_even_if_detectable_has_other_exes() {
+        // Ensure LAUNCHERS exclusion triggers before scanning detectables
+        let list = vec![det("SomeGame", "somegame", false)];
+        let p = ProcessInfo {
+            pid: 5,
+            exe: "steam".into(), // explicit launcher in constant list
+            cmdline: "steam --run-game somegame".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_none());
+    }
+
+    #[test]
+    fn java_process_detectable_name_fallback() {
+        // Detectable name appears in cmdline but no explicit executable entry matches
+        let list = vec![det("BlockWorld", "", false)];
+        let p = ProcessInfo {
+            pid: 6,
+            exe: "java".into(),
+            cmdline: "java -Xmx2G -cp libs/* com.company.BlockWorldMain".into(),
+        };
+        let m = match_process(&p, &list);
+        assert!(m.is_some());
+        assert_eq!(m.unwrap().name, "BlockWorld");
+    }
 }
