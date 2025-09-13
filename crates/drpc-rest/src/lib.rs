@@ -43,11 +43,24 @@ pub async fn run_rest(
     let app = Router::new()
         .route("/health", get(health))
         .route("/activities", get(list_activities).post(set_activity))
-        .route("/activities/{socket_id}", delete(clear_activity))
+        .route("/activities/:socket_id", delete(clear_activity))
         .route("/detectables/refresh", post(refresh_detectables))
         .route("/metrics", get(metrics))
         .route("/privacy", get(get_privacy).post(set_privacy))
         .with_state(state);
+    // Internal subscription to update registry for standalone REST usage
+    let bus_clone = state.bus.clone();
+    let reg_clone = state.registry.clone();
+    tokio::spawn(async move {
+        let mut rx = bus_clone.subscribe();
+        while let Some(evt) = rx.recv().await {
+            match evt {
+                EventKind::ActivityUpdate { socket_id, payload } => reg_clone.set(socket_id, payload),
+                EventKind::Clear { socket_id } => reg_clone.clear(&socket_id),
+                EventKind::PrivacyRefresh => {}
+            }
+        }
+    });
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
     let actual = listener.local_addr()?.port();
     info!(port = actual, "REST listening");
