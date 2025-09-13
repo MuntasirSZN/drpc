@@ -6,6 +6,7 @@ use std::sync::Arc;
 pub enum EventKind {
     ActivityUpdate { socket_id: String, payload: Value },
     Clear { socket_id: String },
+    PrivacyRefresh,
 }
 
 #[derive(Clone)]
@@ -34,6 +35,9 @@ impl EventBus {
         let list = self.inner.read();
         for sub in list.iter() {
             let _ = sub.send(evt.clone());
+        }
+        if let EventKind::ActivityUpdate { .. } = &evt {
+            crate::metrics::ACTIVITIES_SET.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }

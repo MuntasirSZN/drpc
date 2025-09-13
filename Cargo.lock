@@ -506,6 +506,7 @@ dependencies = [
  "drpc-core",
  "drpc-ipc",
  "drpc-process",
+ "drpc-rest",
  "drpc-ws",
  "futures",
  "rustls",
@@ -535,6 +536,7 @@ dependencies = [
 name = "drpc-core"
 version = "0.1.0"
 dependencies = [
+ "once_cell",
  "parking_lot",
  "reqwest",
  "serde",
@@ -566,6 +568,21 @@ dependencies = [
  "parking_lot",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "drpc-rest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "drpc-core",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

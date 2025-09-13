@@ -2,6 +2,7 @@ pub mod activity_registry;
 pub mod detectables;
 pub mod event;
 pub mod frame;
+pub mod metrics;
 pub mod protocol;
 
 pub use activity_registry::*;

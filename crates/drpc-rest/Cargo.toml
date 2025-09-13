@@ -1,0 +1,18 @@
+[package]
+name = "drpc-rest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+drpc-core = { path = "../drpc-core" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+parking_lot.workspace = true
+
+[features]
+default = []

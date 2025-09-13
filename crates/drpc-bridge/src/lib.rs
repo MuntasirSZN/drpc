@@ -120,6 +120,9 @@ async fn bridge_subscriber(bus: EventBus, state: Arc<BridgeState>) {
                 )
                 .await;
             }
+            EventKind::PrivacyRefresh => {
+                // No-op for now (bridge does not filter historical data)
+            }
         }
     }
 }

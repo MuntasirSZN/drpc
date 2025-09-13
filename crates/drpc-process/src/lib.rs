@@ -72,6 +72,8 @@ impl<B: ProcessBackend + 'static> Scanner<B> {
                         name: d.name.clone(),
                         ..Default::default()
                     };
+                    drpc_core::metrics::PROCESSES_DETECTED
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     self.bus.publish(EventKind::ActivityUpdate {
                         socket_id: format!("proc-{}", p.pid),
                         payload: serde_json::to_value(act).unwrap(),

@@ -18,6 +18,8 @@ struct Cli {
     config: Option<PathBuf>,
     #[arg(long)]
     print_socket_paths: bool,
+    #[arg(long, default_value_t = 0)]
+    rest_port: u16,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -49,6 +51,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                     drpc_core::EventKind::Clear { socket_id } => {
                         registry_clone.clear(&socket_id);
+                    }
+                    drpc_core::EventKind::PrivacyRefresh => {
+                        // no-op in registry
                     }
                 }
             }
@@ -105,6 +110,35 @@ async fn main() -> anyhow::Result<()> {
             tracing::info!("process scanner started");
         } else {
             tracing::info!("process scanning disabled");
+        }
+    }
+    #[cfg(feature = "rest")]
+    {
+        let rest_port = cli.rest_port;
+        let reg_clone = registry.clone();
+        let ttl = cli
+            .detectables_ttl
+            .or(file_cfg.detectables_ttl)
+            .unwrap_or(24);
+        // Load detectables (non-forced) for REST refresh endpoint even if scanning disabled
+        let rest_detectables = match drpc_core::load_detectables_async(false, ttl).await {
+            Ok(d) => Some(d),
+            Err(e) => {
+                tracing::warn!(error=?e, "rest detectables load failed; refresh endpoint limited");
+                None
+            }
+        };
+        match drpc_rest::run_rest(
+            bus.clone(),
+            reg_clone.into(),
+            rest_detectables,
+            ttl,
+            rest_port,
+        )
+        .await
+        {
+            Ok(p) => tracing::info!(port = p, "started rest server"),
+            Err(e) => tracing::error!(error=?e, "failed to start rest server"),
         }
     }
     tokio::signal::ctrl_c().await.expect("install ctrl+c");

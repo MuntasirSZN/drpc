@@ -97,6 +97,7 @@ impl IpcServer {
 async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
     let mut handshook = false;
     let socket_id = uuid::Uuid::new_v4().to_string();
+    drpc_core::metrics::ACTIVE_CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let span = info_span!("ipc_connection", %socket_id);
     let _enter = span.enter();
     loop {
@@ -144,13 +145,24 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
                         IpcOp::Frame => {
                             if let Some(cmd) = frame.body.get("cmd").and_then(|c| c.as_str())
                                 && cmd.eq_ignore_ascii_case("SET_ACTIVITY")
-                                && let Some(args) =
-                                    frame.body.get("args").and_then(|a| a.get("activity"))
+                                && let Some(args_root) = frame.body.get("args")
+                                && let Some(act_json) = args_root.get("activity")
                                 && let Ok(activity) =
-                                    serde_json::from_value::<Activity>(args.clone())
+                                    serde_json::from_value::<Activity>(act_json.clone())
                             {
                                 let norm = activity.normalize();
-                                let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
+                                let pid = args_root
+                                    .get("pid")
+                                    .and_then(|p| p.as_u64())
+                                    .map(|p| p as u32);
+                                let nonce = frame.body.get("nonce").cloned();
+                                let out = json!({
+                                    "cmd":"DISPATCH",
+                                    "evt":"ACTIVITY_UPDATE",
+                                    "data": {"activity": norm},
+                                    "pid": pid,
+                                    "nonce": nonce,
+                                });
                                 let buf = encode_frame(IpcOp::Frame, &out);
                                 let _ = stream.write_all(&buf).await;
                                 bus.publish(EventKind::ActivityUpdate {
@@ -170,6 +182,7 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
         }
     }
     bus.publish(EventKind::Clear { socket_id });
+    drpc_core::metrics::ACTIVE_CONNECTIONS.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
 }
 
 #[cfg(windows)]
@@ -233,7 +246,20 @@ async fn handle_client_windows(
                                             serde_json::from_value::<Activity>(args.clone())
                                         {
                                             let norm = activity.normalize();
-                                            let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
+                                            let pid = frame
+                                                .body
+                                                .get("args")
+                                                .and_then(|a| a.get("pid"))
+                                                .and_then(|p| p.as_u64())
+                                                .map(|p| p as u32);
+                                            let nonce = frame.body.get("nonce").cloned();
+                                            let out = json!({
+                                                "cmd":"DISPATCH",
+                                                "evt":"ACTIVITY_UPDATE",
+                                                "data":{"activity":norm},
+                                                "pid": pid,
+                                                "nonce": nonce,
+                                            });
                                             let buf = encode_frame(IpcOp::Frame, &out);
                                             let _ = stream.write_all(&buf).await;
                                             bus.publish(EventKind::ActivityUpdate {

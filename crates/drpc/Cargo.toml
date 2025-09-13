@@ -17,6 +17,7 @@ drpc-bridge = { path = "../drpc-bridge", optional = true }
 drpc-core = { path = "../drpc-core" }
 drpc-ipc = { path = "../drpc-ipc", optional = true }
 drpc-process = { path = "../drpc-process", optional = true }
+drpc-rest = { path = "../drpc-rest", optional = true }
 drpc-ws = { path = "../drpc-ws", optional = true }
 rustls.workspace = true
 serde.workspace = true
@@ -30,9 +31,10 @@ futures.workspace = true
 tokio-tungstenite.workspace = true
 
 [features]
-default = ["bridge", "ipc", "process-scanning", "ws"]
+default = ["bridge", "ipc", "process-scanning", "rest", "ws"]
 bridge = ["dep:drpc-bridge"]
 ipc = ["dep:drpc-ipc"]
 process-scanning = ["dep:drpc-process"]
+rest = ["dep:drpc-rest"]
 test-e2e = ["drpc-core/test-helpers"]
 ws = ["dep:drpc-ws"]

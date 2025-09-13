@@ -81,6 +81,7 @@ async fn ws_handler(
 
 async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
     let socket_id = uuid::Uuid::new_v4().to_string();
+    drpc_core::metrics::ACTIVE_CONNECTIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let span = info_span!("ws_connection", %socket_id);
     let _enter = span.enter();
     let ready = ReadyEvent {
@@ -92,6 +93,7 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
         evt: Some("READY".into()),
         data: serde_json::to_value(ready).unwrap(),
         nonce: None,
+        pid: None,
     };
     if use_etf {
         #[cfg(feature = "etf")]
@@ -143,23 +145,17 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                     .unwrap_or("")
                     .to_uppercase();
                 if maybe_cmd == "SET_ACTIVITY"
-                    && let Some(args) = val.get("args").and_then(|a| a.get("activity"))
-                    && let Ok(activity) = serde_json::from_value::<Activity>(args.clone())
+                    && let Some(resp) = build_activity_update(&val)
                 {
-                    let norm = activity.normalize();
-                    let out =
-                        json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
-                    if socket
-                        .send(Message::Text(out.to_string().into()))
-                        .await
-                        .is_err()
-                    {
+                    if !send_json_or_etf(&mut socket, &resp, use_etf).await {
                         break;
                     }
-                    bus.publish(EventKind::ActivityUpdate {
-                        socket_id: socket_id.clone(),
-                        payload: serde_json::to_value(norm).unwrap_or(json!({})),
-                    });
+                    if let Some(activity) = resp.get("data").and_then(|d| d.get("activity")) {
+                        bus.publish(EventKind::ActivityUpdate {
+                            socket_id: socket_id.clone(),
+                            payload: activity.clone(),
+                        });
+                    }
                     continue;
                 }
                 if maybe_cmd == "CONNECTIONS_CALLBACK" {
@@ -208,6 +204,7 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
         }
     }
     bus.publish(EventKind::Clear { socket_id });
+    drpc_core::metrics::ACTIVE_CONNECTIONS.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
 }
 
 // shared handler for decoded JSON value (used by ETF path)
@@ -223,16 +220,14 @@ async fn handle_incoming_value(
         .unwrap_or("")
         .to_uppercase();
     if maybe_cmd == "SET_ACTIVITY" {
-        if let Some(args) = val.get("args").and_then(|a| a.get("activity"))
-            && let Ok(activity) = serde_json::from_value::<Activity>(args.clone())
-        {
-            let norm = activity.normalize();
-            let out = json!({"cmd":"DISPATCH","evt":"ACTIVITY_UPDATE","data":{"activity":norm}});
-            let _ = socket.send(Message::Text(out.to_string().into())).await;
-            bus.publish(EventKind::ActivityUpdate {
-                socket_id: socket_id.to_string(),
-                payload: serde_json::to_value(norm).unwrap_or(json!({})),
-            });
+        if let Some(resp) = build_activity_update(&val) {
+            let _ = socket.send(Message::Text(resp.to_string().into())).await;
+            if let Some(activity) = resp.get("data").and_then(|d| d.get("activity")) {
+                bus.publish(EventKind::ActivityUpdate {
+                    socket_id: socket_id.to_string(),
+                    payload: activity.clone(),
+                });
+            }
         }
         return;
     }
@@ -371,4 +366,48 @@ impl RpcCommandAsStr for OutgoingFrame {
             RpcCommand::ConnectionsCallback => "CONNECTIONS_CALLBACK",
         }
     }
+}
+// Build a unified ACTIVITY_UPDATE dispatch frame from raw incoming value
+fn build_activity_update(raw: &serde_json::Value) -> Option<serde_json::Value> {
+    let args = raw.get("args")?;
+    let act = args.get("activity")?;
+    let activity: Activity = serde_json::from_value(act.clone()).ok()?;
+    let norm = activity.normalize();
+    let pid = args.get("pid").and_then(|p| p.as_u64()).map(|p| p as u32);
+    let nonce = raw.get("nonce").cloned();
+    Some(json!({
+        "cmd": "DISPATCH",
+        "evt": "ACTIVITY_UPDATE",
+        "data": {"activity": norm},
+        "pid": pid,
+        "nonce": nonce,
+    }))
+}
+
+async fn send_json_or_etf(
+    socket: &mut WebSocket,
+    frame: &serde_json::Value,
+    use_etf: bool,
+) -> bool {
+    if use_etf {
+        #[cfg(feature = "etf")]
+        {
+            match encode_value_etf(frame) {
+                Ok(bin) => return socket.send(Message::Binary(bin.into())).await.is_ok(),
+                Err(e) => warn!(error=?e, "etf encode failed; falling back to json"),
+            }
+        }
+    }
+    socket
+        .send(Message::Text(frame.to_string().into()))
+        .await
+        .is_ok()
+}
+
+#[cfg(feature = "etf")]
+fn encode_value_etf(v: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    let term = json_to_term(v)?;
+    let mut buf = Vec::new();
+    term.encode(&mut buf)?;
+    Ok(buf)
 }

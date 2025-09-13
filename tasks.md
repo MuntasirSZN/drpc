@@ -100,9 +100,8 @@ Acceptance
 - [x] WS integration test (READY then ACTIVITY_UPDATE).
 - [x] IPC integration test (handshake, SET_ACTIVITY).
 - [x] Detectables loader test (TTL, parse fallback).
-- [ ] Process matcher tests.
-  - Added additional matcher coverage (extensions, java fallback, launcher skip).
-- [ ] End-to-end test (WS -> Bridge replay).
+- [x] Process matcher tests (extended coverage: extensions, java fallback, launcher skip).
+- [x] End-to-end test (WS -> Bridge replay).
 
 Acceptance
 
@@ -121,20 +120,22 @@ Acceptance
 ## Stretch / Backlog
 
 - [x] Erlpack/ETF encoding negotiation (eetf crate; binary frames for READY & ACTIVITY_UPDATE).
-- [ ] HTTP REST surface mirroring local RPC.
-- [ ] Live detectables hot-reload endpoint.
-- [ ] Activity privacy filters (allow/deny).
-- [ ] Metrics (feature metrics): active_connections, activities_set, processes_detected, detectables_count.
+- [x] HTTP REST surface mirroring local RPC (GET /activities, POST /activities, DELETE /activities/:id, /health).
+- [x] Live detectables hot-reload endpoint (/detectables/refresh).
+- [x] Activity privacy filters (allow/deny).
+  - [x] REST privacy endpoints (/privacy allow/deny lists; filtered updates).
+- [x] Metrics (feature metrics): active_connections, activities_set, processes_detected, detectables_count.
+  - [x] Metrics counters + /metrics REST endpoint.
 
 ---
 
 ## Definition of Done
 
-- [ ] drpc reproduces local RPC behavior (IPC/WS): client connects, sets activity, Bridge shows status; clears on disconnect.
-- [ ] Command responses match Node semantics for supported set.
-- [ ] Detectables file managed; scanning updates activities periodically (or disabled by flag).
-- [ ] Logging structured; debug mode provides frame-level insight.
-- [ ] Repo includes this roadmap and updated README.
+- [x] drpc reproduces local RPC behavior (IPC/WS): client connects, sets activity, Bridge shows status; clears on disconnect.
+- [ ] Command responses match Node semantics for supported set (nonce echo + pid pending).
+- [x] Detectables file managed; scanning updates activities periodically (or disabled by flag).
+- [x] Logging structured; debug mode provides frame-level insight.
+- [x] Repo includes this roadmap and updated README.
 
 Reference
 

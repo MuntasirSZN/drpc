@@ -24,7 +24,7 @@ pub struct DetectableEntry {
 
 #[derive(Clone, Default)]
 pub struct Detectables {
-    inner: Arc<RwLock<Vec<DetectableEntry>>>,
+    pub inner: Arc<RwLock<Vec<DetectableEntry>>>,
 }
 
 impl Detectables {
@@ -95,6 +95,8 @@ pub async fn load_detectables_async(
         age_hours = Some(age.as_secs() / 3600);
     }
     info!(count = list.len(), stale=need_fetch, age_hours=?age_hours, ttl_hours, "loaded detectables");
+    crate::metrics::DETECTABLES_COUNT
+        .store(list.len() as u64, std::sync::atomic::Ordering::Relaxed);
     Ok(Detectables {
         inner: Arc::new(RwLock::new(list)),
     })
