@@ -14,5 +14,6 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 
 [features]
+test-helpers = []
 default = []
 network = []

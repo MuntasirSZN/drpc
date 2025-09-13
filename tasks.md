@@ -101,6 +101,8 @@ Acceptance
 - [x] IPC integration test (handshake, SET_ACTIVITY).
 - [x] Detectables loader test (TTL, parse fallback).
 - [ ] Process matcher tests.
+  - Added additional matcher coverage (extensions, java fallback, launcher skip).
+- [ ] End-to-end test (WS -> Bridge replay).
 
 Acceptance
 
@@ -119,6 +121,7 @@ Acceptance
 ## Stretch / Backlog
 
 - [ ] Erlpack/ETF encoding negotiation.
+  - scaffolded: accepts encoding=etf (fallback to JSON); full binary pending.
 - [ ] HTTP REST surface mirroring local RPC.
 - [ ] Live detectables hot-reload endpoint.
 - [ ] Activity privacy filters (allow/deny).

@@ -18,9 +18,14 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+[dev-dependencies]
+tokio-tungstenite = { workspace = true }
+futures = { workspace = true }
+
 [features]
 bridge = ["dep:drpc-bridge"]
 default = ["bridge", "ipc", "process-scanning", "ws"]
 ipc = ["dep:drpc-ipc"]
 process-scanning = ["dep:drpc-process"]
 ws = ["dep:drpc-ws"]
+test-e2e = ["drpc-core/test-helpers"]

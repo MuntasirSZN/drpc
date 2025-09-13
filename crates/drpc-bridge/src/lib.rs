@@ -17,7 +17,7 @@ pub struct Bridge {
 
 impl Bridge {
     pub async fn run(bus: EventBus, port: Option<u16>) -> anyhow::Result<Self> {
-        let port = port.unwrap_or(1337);
+        let requested = port.unwrap_or(1337);
         let state = Arc::new(BridgeState {
             activities: RwLock::new(HashMap::new()),
             bus: bus.clone(),
@@ -32,12 +32,17 @@ impl Bridge {
             "/",
             get(move |ws: WebSocketUpgrade| bridge_handler(ws, state.clone())),
         );
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-        info!(port, "Bridge listening");
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", requested)).await?;
+        let actual_port = listener.local_addr()?.port();
+        info!(
+            port = actual_port,
+            requested_port = requested,
+            "Bridge listening"
+        );
         tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
-        Ok(Self { port })
+        Ok(Self { port: actual_port })
     }
     pub fn port(&self) -> u16 {
         self.port
