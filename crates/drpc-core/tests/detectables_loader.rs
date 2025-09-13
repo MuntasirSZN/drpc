@@ -16,7 +16,13 @@ async fn ttl_and_fresh_load_behavior() {
             .as_nanos()
     ));
     std::fs::create_dir_all(base.join(".drpc")).unwrap();
+
+    #[cfg(windows)]
+    std::env::set_var("USERPROFILE", &base);
+    
+    #[cfg(not(windows))]
     std::env::set_var("HOME", &base);
+
     let path = base.join(".drpc").join("detectables.json");
     let json = r#"[
         {"id":"app1","name":"App1","executables":[{"name":"app1.exe","is_launcher":false}]}
