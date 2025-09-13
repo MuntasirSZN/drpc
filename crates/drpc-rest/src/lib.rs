@@ -40,6 +40,7 @@ pub async fn run_rest(
         allow: Arc::new(RwLock::new(None)),
         deny: Arc::new(RwLock::new(None)),
     };
+    let app_state = state.clone();
     let app = Router::new()
         .route("/health", get(health))
         .route("/activities", get(list_activities).post(set_activity))
@@ -47,7 +48,7 @@ pub async fn run_rest(
         .route("/detectables/refresh", post(refresh_detectables))
         .route("/metrics", get(metrics))
         .route("/privacy", get(get_privacy).post(set_privacy))
-        .with_state(state);
+        .with_state(app_state);
     // Internal subscription to update registry for standalone REST usage
     let bus_clone = state.bus.clone();
     let reg_clone = state.registry.clone();
