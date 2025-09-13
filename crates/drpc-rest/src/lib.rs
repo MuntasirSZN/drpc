@@ -44,7 +44,7 @@ pub async fn run_rest(
     let app = Router::new()
         .route("/health", get(health))
         .route("/activities", get(list_activities).post(set_activity))
-        .route("/activities/:socket_id", delete(clear_activity))
+        .route("/activities/{socket_id}", delete(clear_activity))
         .route("/detectables/refresh", post(refresh_detectables))
         .route("/metrics", get(metrics))
         .route("/privacy", get(get_privacy).post(set_privacy))
@@ -56,7 +56,9 @@ pub async fn run_rest(
         let mut rx = bus_clone.subscribe();
         while let Some(evt) = rx.recv().await {
             match evt {
-                EventKind::ActivityUpdate { socket_id, payload } => reg_clone.set(socket_id, payload),
+                EventKind::ActivityUpdate { socket_id, payload } => {
+                    reg_clone.set(socket_id, payload)
+                }
                 EventKind::Clear { socket_id } => reg_clone.clear(&socket_id),
                 EventKind::PrivacyRefresh => {}
             }
