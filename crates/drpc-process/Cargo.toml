@@ -1,14 +1,21 @@
 [package]
 name = "drpc-process"
 version = "0.1.0"
+authors.workspace = true
 edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
 
 [dependencies]
 async-trait = "0.1"
 drpc-core = { path = "../drpc-core" }
-parking_lot = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
+parking_lot.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
 
 [features]
 default = []

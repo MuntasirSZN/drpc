@@ -18,10 +18,14 @@ async fn ttl_and_fresh_load_behavior() {
     std::fs::create_dir_all(base.join(".drpc")).unwrap();
 
     #[cfg(windows)]
-    std::env::set_var("USERPROFILE", &base);
-    
+    unsafe {
+        std::env::set_var("USERPROFILE", &base);
+    }
+
     #[cfg(not(windows))]
-    std::env::set_var("HOME", &base);
+    unsafe {
+        std::env::set_var("HOME", &base);
+    }
 
     let path = base.join(".drpc").join("detectables.json");
     let json = r#"[
@@ -31,14 +35,18 @@ async fn ttl_and_fresh_load_behavior() {
 
     // Fresh load should parse existing file
     // Ensure offline to avoid any network fetch regardless of feature flags
-    std::env::set_var("DRPC_OFFLINE", "1");
-    let d = drpc_core::load_detectables_async(false, 1000).await;
+    unsafe {
+        std::env::set_var("DRPC_OFFLINE", "1");
+    }
+    let d = drpc_core::load_detectables_async(false, 1000)
+        .await
+        .unwrap();
     let list = d.list();
     assert_eq!(list.len(), 1);
 
     // After some time and TTL=0, should be considered stale.
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    let d2 = drpc_core::load_detectables_async(false, 0).await;
+    let d2 = drpc_core::load_detectables_async(false, 0).await.unwrap();
     let list2 = d2.list();
     // With network feature disabled, stale path returns empty set
     assert_eq!(list2.len(), 0);
@@ -58,13 +66,27 @@ async fn parse_fallback_on_invalid_json() {
             .as_nanos()
     ));
     std::fs::create_dir_all(base.join(".drpc")).unwrap();
-    std::env::set_var("HOME", &base);
+
+    #[cfg(windows)]
+    unsafe {
+        std::env::set_var("USERPROFILE", &base);
+    }
+
+    #[cfg(not(windows))]
+    unsafe {
+        std::env::set_var("HOME", &base);
+    }
+
     let path = base.join(".drpc").join("detectables.json");
     std::fs::write(&path, "not-json").unwrap();
 
     // Should fall back to empty list when parse fails; ensure offline to avoid network provider needs
-    std::env::set_var("DRPC_OFFLINE", "1");
-    let d = drpc_core::load_detectables_async(false, 1000).await;
+    unsafe {
+        std::env::set_var("DRPC_OFFLINE", "1");
+    }
+    let d = drpc_core::load_detectables_async(false, 1000)
+        .await
+        .unwrap();
     let list = d.list();
     assert_eq!(list.len(), 0);
 }

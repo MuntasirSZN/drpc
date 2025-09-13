@@ -12,12 +12,13 @@ members = [
 [workspace.package]
 version = "0.1.0"
 authors = ["MuntasirSZN <muntasir.joypurhat@gmail.com>"]
-edition = "2021"
-description = "Open Discord RPC server for atypical setups in Rust"
+edition = "2024"
+description = "Open Discord RPC server for atypical setups in rust 🦀"
 readme = "README.md"
-repository = "https://github.com/MuntasirSZN/drpc-rs"
+repository = "https://github.com/MuntasirSZN/drpc"
 license = "MIT"
 keywords = ["discord", "rpc", "websocket"]
+documentation = "https://github.com/MuntasirSZN/drpc"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -26,12 +27,12 @@ clap = { version = "4", features = ["derive"] }
 futures = "0.3"
 parking_lot = "0.12"
 reqwest = { version = "0.12", default-features = false, features = [
+  "gzip",
   "http2",
   "json",
   "rustls-tls-native-roots-no-provider",
   "socks",
   "system-proxy",
-  "gzip",
 ] }
 rustls = { version = "0.23.31", default-features = false, features = [
   "aws_lc_rs",
@@ -40,8 +41,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.27", features = ["rustls-tls-native-roots"] }
 toml = "0.9"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1", features = ["serde", "v4"] }
-tokio-tungstenite = { version = "0.27", features = ["rustls-tls-native-roots"] }

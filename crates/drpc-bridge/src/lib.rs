@@ -1,8 +1,8 @@
 use axum::{
+    Router,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use drpc_core::{EventBus, EventKind};
 use futures::StreamExt;

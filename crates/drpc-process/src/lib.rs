@@ -2,7 +2,7 @@ use drpc_core::{Activity, DetectableEntry, Detectables, EventBus, EventKind};
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
 #[derive(Default, Clone)]
 pub struct ProcessInfo {

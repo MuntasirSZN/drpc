@@ -90,7 +90,15 @@ async fn main() -> anyhow::Result<()> {
                 .detectables_ttl
                 .or(file_cfg.detectables_ttl)
                 .unwrap_or(24);
-            let detectables = drpc_core::load_detectables_async(cli.refresh_detectables, ttl).await;
+            let detectables = match drpc_core::load_detectables_async(cli.refresh_detectables, ttl)
+                .await
+            {
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::error!(error=?e, "failed to load detectables; continuing with empty set");
+                    drpc_core::Detectables::default()
+                }
+            };
             let backend = drpc_process::LinuxBackend; // placeholder
             let scanner = drpc_process::Scanner::new(backend, detectables, bus.clone());
             scanner.spawn();
@@ -110,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn init_tracing(cli: &Cli) {
-    use tracing_subscriber::{fmt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt};
     let level = if std::env::var("DRPC_DEBUG").ok().as_deref() == Some("1") {
         "debug"
     } else {
@@ -127,11 +135,8 @@ fn init_tracing(cli: &Cli) {
 
 fn load_config(path: Option<PathBuf>) -> anyhow::Result<FileConfig> {
     let p = path.unwrap_or_else(|| {
-        let home = std::env::home_dir().unwrap_or_else(|_| ".".into());
-        let mut dir = PathBuf::from(home);
-        dir.push(".drpc");
-        dir.push("config.toml");
-        dir
+        let home = std::env::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        home.join(".drpc").join("config.toml")
     });
     if p.exists() {
         Ok(toml::from_str(&std::fs::read_to_string(p)?)?)

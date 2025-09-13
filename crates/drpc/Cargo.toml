@@ -1,31 +1,38 @@
 [package]
 name = "drpc"
 version = "0.1.0"
+authors.workspace = true
 edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-clap = { workspace = true }
-drpc-bridge = { optional = true, path = "../drpc-bridge" }
+clap.workspace = true
+drpc-bridge = { path = "../drpc-bridge", optional = true }
 drpc-core = { path = "../drpc-core" }
-drpc-ipc = { optional = true, path = "../drpc-ipc" }
-drpc-process = { optional = true, path = "../drpc-process" }
-drpc-ws = { optional = true, path = "../drpc-ws" }
-rustls = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
-toml = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+drpc-ipc = { path = "../drpc-ipc", optional = true }
+drpc-process = { path = "../drpc-process", optional = true }
+drpc-ws = { path = "../drpc-ws", optional = true }
+rustls.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
-tokio-tungstenite = { workspace = true }
-futures = { workspace = true }
+futures.workspace = true
+tokio-tungstenite.workspace = true
 
 [features]
-bridge = ["dep:drpc-bridge"]
 default = ["bridge", "ipc", "process-scanning", "ws"]
+bridge = ["dep:drpc-bridge"]
 ipc = ["dep:drpc-ipc"]
 process-scanning = ["dep:drpc-process"]
-ws = ["dep:drpc-ws"]
 test-e2e = ["drpc-core/test-helpers"]
+ws = ["dep:drpc-ws"]

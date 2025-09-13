@@ -33,19 +33,19 @@ impl Detectables {
     }
 }
 
-pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Detectables {
-    let path = detectables_path();
+pub async fn load_detectables_async(
+    force_refresh: bool,
+    ttl_hours: u64,
+) -> Result<Detectables, Box<dyn std::error::Error>> {
+    let path = detectables_path()?;
     let mut need_fetch = force_refresh || !path.exists();
-    if !need_fetch {
-        if let Ok(meta) = std::fs::metadata(&path) {
-            if let Ok(modified) = meta.modified() {
-                if let Ok(age) = SystemTime::now().duration_since(modified) {
-                    if age > Duration::from_secs(ttl_hours * 3600) {
-                        need_fetch = true;
-                    }
-                }
-            }
-        }
+    if !need_fetch
+        && let Ok(meta) = std::fs::metadata(&path)
+        && let Ok(modified) = meta.modified()
+        && let Ok(age) = SystemTime::now().duration_since(modified)
+        && age > Duration::from_secs(ttl_hours * 3600)
+    {
+        need_fetch = true;
     }
     let mut list: Vec<DetectableEntry> = Vec::new();
     if need_fetch {
@@ -88,25 +88,22 @@ pub async fn load_detectables_async(force_refresh: bool, ttl_hours: u64) -> Dete
         }
     }
     let mut age_hours: Option<u64> = None;
-    if let Ok(meta) = std::fs::metadata(&path) {
-        if let Ok(modified) = meta.modified() {
-            if let Ok(age) = SystemTime::now().duration_since(modified) {
-                age_hours = Some(age.as_secs() / 3600);
-            }
-        }
+    if let Ok(meta) = std::fs::metadata(&path)
+        && let Ok(modified) = meta.modified()
+        && let Ok(age) = SystemTime::now().duration_since(modified)
+    {
+        age_hours = Some(age.as_secs() / 3600);
     }
     info!(count = list.len(), stale=need_fetch, age_hours=?age_hours, ttl_hours, "loaded detectables");
-    Detectables {
+    Ok(Detectables {
         inner: Arc::new(RwLock::new(list)),
-    }
+    })
 }
 
-fn detectables_path() -> PathBuf {
-    let home = std::env::home_dir().unwrap_or_else(|_| ".".into());
-    let mut p = PathBuf::from(home);
-    p.push(".drpc");
-    p.push("detectables.json");
-    p
+fn detectables_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let home = std::env::home_dir()
+        .ok_or_else(|| Box::<dyn std::error::Error>::from("Unable to find home directory"))?;
+    Ok(home.join(".drpc").join("detectables.json"))
 }
 
 #[cfg(feature = "network")]

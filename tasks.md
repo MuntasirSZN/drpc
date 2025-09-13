@@ -120,8 +120,7 @@ Acceptance
 
 ## Stretch / Backlog
 
-- [ ] Erlpack/ETF encoding negotiation.
-  - scaffolded: accepts encoding=etf (fallback to JSON); full binary pending.
+- [x] Erlpack/ETF encoding negotiation (eetf crate; binary frames for READY & ACTIVITY_UPDATE).
 - [ ] HTTP REST surface mirroring local RPC.
 - [ ] Live detectables hot-reload endpoint.
 - [ ] Activity privacy filters (allow/deny).

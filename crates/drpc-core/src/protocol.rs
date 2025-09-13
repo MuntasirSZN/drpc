@@ -173,10 +173,10 @@ impl Activity {
             }
         }
         // instance flag -> flags bit 0
-        if let Some(inst) = self.instance {
-            if inst {
-                self.flags = Some(self.flags.unwrap_or(0) | 1);
-            }
+        if let Some(inst) = self.instance
+            && inst
+        {
+            self.flags = Some(self.flags.unwrap_or(0) | 1);
         }
         if let Some(btns) = self.buttons.as_ref() {
             let labels: Vec<String> = btns.iter().map(|b| b.label.clone()).collect();

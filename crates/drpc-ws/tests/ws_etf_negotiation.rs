@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use tokio_tungstenite::connect_async;
 
-// Negotiating ETF should still succeed (falling back to JSON until implemented)
+// Negotiating ETF should return a binary READY frame when feature enabled.
 #[tokio::test]
 async fn ws_etf_query_fallbacks() {
     let bus = drpc_core::EventBus::new();
@@ -13,9 +13,16 @@ async fn ws_etf_query_fallbacks() {
     .await
     .expect("connect");
     let msg = ws.next().await.expect("ready");
-    let txt = match msg {
-        Ok(tokio_tungstenite::tungstenite::Message::Text(t)) => t,
-        other => panic!("expected text got {other:?}"),
-    };
-    assert!(txt.contains("READY"));
+    match msg {
+        Ok(tokio_tungstenite::tungstenite::Message::Binary(bin)) => {
+            // Basic sanity: ETF version tag 131 and contains atom 'evt'
+            assert_eq!(bin[0], 131, "expected ETF version tag");
+            assert!(
+                bin.windows(3).any(|w| w == b"evt"),
+                "evt key missing in etf frame"
+            );
+        }
+        Ok(other) => panic!("expected binary etf frame got {other:?}"),
+        Err(e) => panic!("ws error {e}"),
+    }
 }
