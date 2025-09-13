@@ -14,5 +14,9 @@ tracing.workspace = true
 uuid.workspace = true
 parking_lot.workspace = true
 
+[dev-dependencies]
+reqwest.workspace = true
+rustls.workspace = true
+
 [features]
 default = []

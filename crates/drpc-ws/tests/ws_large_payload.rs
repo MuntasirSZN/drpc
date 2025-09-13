@@ -29,5 +29,8 @@ async fn ws_rejects_large_payload() {
         other => panic!("expected Close frame, got {:?}", other),
     }
     let final_msg = ws.next().await; // Should now be None
-    assert!(final_msg.is_none(), "connection not terminated after close frame");
+    assert!(
+        final_msg.is_none(),
+        "connection not terminated after close frame"
+    );
 }

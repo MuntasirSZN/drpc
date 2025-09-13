@@ -15,4 +15,3 @@ fn registry_set_and_clear_and_non_null() {
     assert_eq!(nn.len(), 1);
     assert_eq!(nn[0].0, "sock2");
 }
-

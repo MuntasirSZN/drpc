@@ -15,16 +15,36 @@ async fn rest_activity_and_metrics() {
     let base = format!("http://127.0.0.1:{}", port);
     let client = Client::new();
     // Post activity
-    let resp: Value = client.post(format!("{}/activities", base))
+    let resp: Value = client
+        .post(format!("{}/activities", base))
         .json(&serde_json::json!({"activity":{"name":"RestGame"}}))
-        .send().await.unwrap()
-        .json().await.unwrap();
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     let sid = resp["socket_id"].as_str().unwrap().to_string();
     // List
     let mut found = false;
     for _ in 0..10 {
-        let list: Value = client.get(format!("{}/activities", base)).send().await.unwrap().json().await.unwrap();
-        if list["activities"].as_array().unwrap().iter().any(|e| e[1]["name"]=="RestGame") { found = true; break; }
+        let list: Value = client
+            .get(format!("{}/activities", base))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        if list["activities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e[1]["name"] == "RestGame")
+        {
+            found = true;
+            break;
+        }
         tokio::time::sleep(std::time::Duration::from_millis(30)).await;
     }
     assert!(found, "activity not found after retries");

@@ -10,4 +10,3 @@ fn metrics_snapshot_increments() {
     assert_eq!(snap["processes_detected"].as_u64().unwrap(), 1);
     assert_eq!(snap["detectables_count"].as_u64().unwrap(), 5);
 }
-
