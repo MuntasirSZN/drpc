@@ -31,6 +31,7 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls-native-roots-no-provider",
   "socks",
   "system-proxy",
+  "gzip",
 ] }
 rustls = { version = "0.23.31", default-features = false, features = [
   "aws_lc_rs",

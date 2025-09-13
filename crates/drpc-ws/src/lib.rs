@@ -67,18 +67,18 @@ async fn ws_handler(
     if q.v.unwrap_or(1) != 1 {
         return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
-    if let Some(enc) = &q.encoding {
-        if enc.to_lowercase() != "json" {
-            return axum::http::StatusCode::BAD_REQUEST.into_response();
-        }
+    let encoding = q.encoding.as_deref().unwrap_or("json").to_lowercase();
+    if encoding != "json" && encoding != "etf" {
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
     if q.client_id.is_none() {
         return axum::http::StatusCode::BAD_REQUEST.into_response();
     }
-    ws.on_upgrade(|socket| async move { handle_socket(socket, bus).await })
+    let use_etf = encoding == "etf";
+    ws.on_upgrade(move |socket| async move { handle_socket(socket, bus, use_etf).await })
 }
 
-async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
+async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
     let socket_id = uuid::Uuid::new_v4().to_string();
     let span = info_span!("ws_connection", %socket_id);
     let _enter = span.enter();
@@ -92,12 +92,12 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus) {
         data: serde_json::to_value(ready).unwrap(),
         nonce: None,
     };
-    let json = serde_json::to_string(&frame).unwrap();
-    if socket
-        .send(axum::extract::ws::Message::Text(json.into()))
-        .await
-        .is_err()
-    {
+    // ETF not yet implemented, send JSON even if ETF requested but mark via debug log
+    if use_etf {
+        debug!("ETF requested but not implemented; falling back to JSON");
+    }
+    let json_txt = serde_json::to_string(&frame).unwrap();
+    if socket.send(Message::Text(json_txt.into())).await.is_err() {
         return;
     }
     while let Some(Ok(msg)) = socket.next().await {
