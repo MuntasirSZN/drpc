@@ -127,7 +127,7 @@ fn init_tracing(cli: &Cli) {
 
 fn load_config(path: Option<PathBuf>) -> anyhow::Result<FileConfig> {
     let p = path.unwrap_or_else(|| {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let home = std::env::home_dir().unwrap_or_else(|_| ".".into());
         let mut dir = PathBuf::from(home);
         dir.push(".drpc");
         dir.push("config.toml");
