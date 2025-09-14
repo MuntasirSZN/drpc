@@ -132,7 +132,7 @@ Acceptance
 ## Definition of Done
 
 - [x] drpc reproduces local RPC behavior (IPC/WS): client connects, sets activity, Bridge shows status; clears on disconnect.
-- [ ] Command responses match Node semantics for supported set (nonce echo + pid pending).
+- [x] Command responses match Node semantics for supported set (added nonce/pid echo, PING/PONG, SUBSCRIBE/UNSUBSCRIBE stubs).
 - [x] Detectables file managed; scanning updates activities periodically (or disabled by flag).
 - [x] Logging structured; debug mode provides frame-level insight.
 - [x] Repo includes this roadmap and updated README.

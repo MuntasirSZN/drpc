@@ -158,6 +158,18 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                     }
                     continue;
                 }
+                if maybe_cmd == "PING" {
+                    let nonce = val.get("nonce").cloned();
+                    let pong = json!({"cmd":"DISPATCH","evt":"PONG","data":{},"nonce":nonce});
+                    let _ = send_json_or_etf(&mut socket, &pong, use_etf).await;
+                    continue;
+                }
+                if matches!(maybe_cmd.as_str(), "SUBSCRIBE" | "UNSUBSCRIBE") {
+                    let nonce = val.get("nonce").cloned();
+                    let ack = json!({"cmd":"DISPATCH","evt":"ACK","data":{},"nonce":nonce});
+                    let _ = send_json_or_etf(&mut socket, &ack, use_etf).await;
+                    continue;
+                }
                 if maybe_cmd == "CONNECTIONS_CALLBACK" {
                     let out = json!({"cmd":"DISPATCH","evt":"ERROR","data":{"code":1000}});
                     let _ = socket.send(Message::Text(out.to_string().into())).await;
