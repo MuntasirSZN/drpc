@@ -18,27 +18,33 @@ use std::collections::HashMap;
 use tracing::{debug, info, info_span, warn};
 
 pub async fn run_ws_server(bus: EventBus) -> anyhow::Result<u16> {
-    let port = pick_port().await?;
+    // Bind atomically to avoid test races selecting the same port
+    let mut listener_opt = None;
+    let mut chosen_port = 0u16;
+    for p in 6463u16..=6472 {
+        match tokio::net::TcpListener::bind(("127.0.0.1", p)).await {
+            Ok(l) => {
+                listener_opt = Some(l);
+                chosen_port = p;
+                break;
+            }
+            Err(_) => continue,
+        }
+    }
+    let listener = if let Some(l) = listener_opt {
+        l
+    } else {
+        // As a last resort (tests), let OS assign a free port
+        let l = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await?;
+        chosen_port = l.local_addr()?.port();
+        l
+    };
     let app = Router::new().route("/", get(move |h, q, ws| ws_handler(h, q, ws, bus.clone())));
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-    info!(port, "WS RPC listening");
+    info!(port = chosen_port, "WS RPC listening");
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
-    Ok(port)
-}
-
-async fn pick_port() -> anyhow::Result<u16> {
-    for p in 6463u16..=6472 {
-        if tokio::net::TcpListener::bind(("127.0.0.1", p))
-            .await
-            .is_ok()
-        {
-            // immediately drop test listener; actual listener created later
-            return Ok(p);
-        }
-    }
-    anyhow::bail!("no free port 6463-6472")
+    Ok(chosen_port)
 }
 
 #[derive(Debug, Deserialize)]
@@ -151,9 +157,14 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                         continue;
                     }
                     if let Some(resp) = build_activity_update(&val) {
-                        if !send_json_or_etf(&mut socket, &resp, use_etf).await { break; }
+                        if !send_json_or_etf(&mut socket, &resp, use_etf).await {
+                            break;
+                        }
                         if let Some(activity) = resp.get("data").and_then(|d| d.get("activity")) {
-                            bus.publish(EventKind::ActivityUpdate { socket_id: socket_id.clone(), payload: activity.clone() });
+                            bus.publish(EventKind::ActivityUpdate {
+                                socket_id: socket_id.clone(),
+                                payload: activity.clone(),
+                            });
                         }
                         continue;
                     }
@@ -167,8 +178,12 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                 if maybe_cmd == "AUTHORIZE" {
                     let nonce = val.get("nonce").cloned();
                     let args = val.get("args");
-                    let client_id_ok = args.and_then(|a| a.get("client_id").and_then(|v| v.as_str())).is_some();
-                    let scopes_ok = args.and_then(|a| a.get("scopes").and_then(|v| v.as_array())).is_some();
+                    let client_id_ok = args
+                        .and_then(|a| a.get("client_id").and_then(|v| v.as_str()))
+                        .is_some();
+                    let scopes_ok = args
+                        .and_then(|a| a.get("scopes").and_then(|v| v.as_array()))
+                        .is_some();
                     let (code, message) = if client_id_ok && scopes_ok {
                         (1000, "Authorization not supported in drpc")
                     } else {
@@ -181,28 +196,51 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                 if maybe_cmd == "AUTHENTICATE" {
                     let nonce = val.get("nonce").cloned();
                     let args = val.get("args");
-                    let token_ok = args.and_then(|a| a.get("access_token").and_then(|v| v.as_str())).is_some();
-                    let (code, message) = if token_ok { (1000, "Authentication not supported in drpc") } else { (4000, "Invalid payload: missing access_token") };
+                    let token_ok = args
+                        .and_then(|a| a.get("access_token").and_then(|v| v.as_str()))
+                        .is_some();
+                    let (code, message) = if token_ok {
+                        (1000, "Authentication not supported in drpc")
+                    } else {
+                        (4000, "Invalid payload: missing access_token")
+                    };
                     let out = json!({"cmd":"AUTHENTICATE","evt":"ERROR","data":{"code":code,"message":message},"nonce":nonce});
                     let _ = send_json_or_etf(&mut socket, &out, use_etf).await;
                     continue;
                 }
                 if matches!(maybe_cmd.as_str(), "SUBSCRIBE" | "UNSUBSCRIBE") {
                     let nonce = val.get("nonce").cloned();
-                    let evt_name = val.get("args").and_then(|a| a.get("event")).and_then(|e| e.as_str());
+                    let evt_name = val
+                        .get("args")
+                        .and_then(|a| a.get("event"))
+                        .and_then(|e| e.as_str());
                     if evt_name.is_none() {
                         let err = json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Invalid payload: missing args.event"}, "nonce": nonce});
                         let _ = send_json_or_etf(&mut socket, &err, use_etf).await;
                         continue;
                     }
                     // Minimal validation: allow known events else error
-                    let allowed = matches!(evt_name.unwrap(),
-                        "GUILD_STATUS" | "GUILD_CREATE" | "CHANNEL_CREATE" |
-                        "VOICE_CHANNEL_SELECT" | "VOICE_STATE_CREATE" | "VOICE_STATE_UPDATE" |
-                        "VOICE_STATE_DELETE" | "VOICE_SETTINGS_UPDATE" | "VOICE_CONNECTION_STATUS" |
-                        "SPEAKING_START" | "SPEAKING_STOP" | "MESSAGE_CREATE" | "MESSAGE_UPDATE" |
-                        "MESSAGE_DELETE" | "NOTIFICATION_CREATE" | "ACTIVITY_JOIN" | "ACTIVITY_SPECTATE" |
-                        "ACTIVITY_JOIN_REQUEST");
+                    let allowed = matches!(
+                        evt_name.unwrap(),
+                        "GUILD_STATUS"
+                            | "GUILD_CREATE"
+                            | "CHANNEL_CREATE"
+                            | "VOICE_CHANNEL_SELECT"
+                            | "VOICE_STATE_CREATE"
+                            | "VOICE_STATE_UPDATE"
+                            | "VOICE_STATE_DELETE"
+                            | "VOICE_SETTINGS_UPDATE"
+                            | "VOICE_CONNECTION_STATUS"
+                            | "SPEAKING_START"
+                            | "SPEAKING_STOP"
+                            | "MESSAGE_CREATE"
+                            | "MESSAGE_UPDATE"
+                            | "MESSAGE_DELETE"
+                            | "NOTIFICATION_CREATE"
+                            | "ACTIVITY_JOIN"
+                            | "ACTIVITY_SPECTATE"
+                            | "ACTIVITY_JOIN_REQUEST"
+                    );
                     if !allowed {
                         let err = json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Invalid payload: unknown event"}, "nonce": nonce});
                         let _ = send_json_or_etf(&mut socket, &err, use_etf).await;
@@ -223,9 +261,13 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                     let _ = send_json_or_etf(&mut socket, &out, use_etf).await;
                     continue;
                 }
-                if matches!(maybe_cmd.as_str(), "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK") {
+                if matches!(
+                    maybe_cmd.as_str(),
+                    "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK"
+                ) {
                     let nonce = val.get("nonce").cloned();
-                    let out = json!({"cmd": maybe_cmd, "evt":"ACK","data":{"ok":true}, "nonce": nonce});
+                    let out =
+                        json!({"cmd": maybe_cmd, "evt":"ACK","data":{"ok":true}, "nonce": nonce});
                     let _ = send_json_or_etf(&mut socket, &out, use_etf).await;
                     continue;
                 }
@@ -251,7 +293,8 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                 if use_etf {
                     match decode_frame_etf(&bin) {
                         Ok(val) => {
-                            handle_incoming_value(&mut socket, val, &bus, &socket_id, use_etf).await;
+                            handle_incoming_value(&mut socket, val, &bus, &socket_id, use_etf)
+                                .await;
                             continue;
                         }
                         Err(e) => warn!(error=?e, "etf decode failed; ignoring frame"),
@@ -285,7 +328,10 @@ async fn handle_incoming_value(
         } else if let Some(resp) = build_activity_update(&val) {
             let _ = send_json_or_etf(socket, &resp, use_etf).await;
             if let Some(activity) = resp.get("data").and_then(|d| d.get("activity")) {
-                bus.publish(EventKind::ActivityUpdate { socket_id: socket_id.to_string(), payload: activity.clone() });
+                bus.publish(EventKind::ActivityUpdate {
+                    socket_id: socket_id.to_string(),
+                    payload: activity.clone(),
+                });
             }
         }
         return;
@@ -295,29 +341,48 @@ async fn handle_incoming_value(
         let _ = send_json_or_etf(socket, &out, use_etf).await;
         return;
     }
-    if matches!(maybe_cmd.as_str(), "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK" | "SUBSCRIBE" | "UNSUBSCRIBE") {
+    if matches!(
+        maybe_cmd.as_str(),
+        "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK" | "SUBSCRIBE" | "UNSUBSCRIBE"
+    ) {
         let out = json!({"cmd": maybe_cmd, "evt":"ACK","data":{}});
         let _ = send_json_or_etf(socket, &out, use_etf).await;
         return;
     }
     if maybe_cmd == "AUTHORIZE" {
         let args = val.get("args");
-        let client_id_ok = args.and_then(|a| a.get("client_id").and_then(|v| v.as_str())).is_some();
-        let scopes_ok = args.and_then(|a| a.get("scopes").and_then(|v| v.as_array())).is_some();
-        let (code, message) = if client_id_ok && scopes_ok { (1000, "Authorization not supported in drpc") } else { (4000, "Invalid payload: missing client_id or scopes") };
+        let client_id_ok = args
+            .and_then(|a| a.get("client_id").and_then(|v| v.as_str()))
+            .is_some();
+        let scopes_ok = args
+            .and_then(|a| a.get("scopes").and_then(|v| v.as_array()))
+            .is_some();
+        let (code, message) = if client_id_ok && scopes_ok {
+            (1000, "Authorization not supported in drpc")
+        } else {
+            (4000, "Invalid payload: missing client_id or scopes")
+        };
         let out = json!({"cmd":"AUTHORIZE","evt":"ERROR","data":{"code":code,"message":message}});
         let _ = send_json_or_etf(socket, &out, use_etf).await;
         return;
     }
     if maybe_cmd == "AUTHENTICATE" {
         let args = val.get("args");
-        let token_ok = args.and_then(|a| a.get("access_token").and_then(|v| v.as_str())).is_some();
-        let (code, message) = if token_ok { (1000, "Authentication not supported in drpc") } else { (4000, "Invalid payload: missing access_token") };
-        let out = json!({"cmd":"AUTHENTICATE","evt":"ERROR","data":{"code":code,"message":message}});
+        let token_ok = args
+            .and_then(|a| a.get("access_token").and_then(|v| v.as_str()))
+            .is_some();
+        let (code, message) = if token_ok {
+            (1000, "Authentication not supported in drpc")
+        } else {
+            (4000, "Invalid payload: missing access_token")
+        };
+        let out =
+            json!({"cmd":"AUTHENTICATE","evt":"ERROR","data":{"code":code,"message":message}});
         let _ = send_json_or_etf(socket, &out, use_etf).await;
         return;
     }
-    let out = json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Unknown command"}});
+    let out =
+        json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Unknown command"}});
     let _ = send_json_or_etf(socket, &out, use_etf).await;
 }
 #[cfg(feature = "etf")]
@@ -488,7 +553,7 @@ fn validate_activity_payload(raw: &serde_json::Value) -> Option<serde_json::Valu
                 "evt": "ERROR",
                 "data": {"code": 4000, "message": "Invalid payload: missing args"},
                 "nonce": nonce,
-            }))
+            }));
         }
     };
     let act = match args.get("activity") {
@@ -499,7 +564,7 @@ fn validate_activity_payload(raw: &serde_json::Value) -> Option<serde_json::Valu
                 "evt": "ERROR",
                 "data": {"code": 4000, "message": "Invalid payload: missing activity"},
                 "nonce": nonce,
-            }))
+            }));
         }
     };
     if !act.is_object() {
