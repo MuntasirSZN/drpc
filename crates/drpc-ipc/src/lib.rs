@@ -129,6 +129,7 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
                     debug!("handshake accepted");
                     // respond with READY DISPATCH full payload
                     let ready_data = ReadyEvent {
+                        v: 1,
                         config: ReadyConfig::default(),
                         user: MockUser::default(),
                     };
@@ -145,30 +146,44 @@ async fn handle_client(mut stream: tokio::net::UnixStream, bus: EventBus) {
                         IpcOp::Frame => {
                             if let Some(cmd) = frame.body.get("cmd").and_then(|c| c.as_str())
                                 && cmd.eq_ignore_ascii_case("SET_ACTIVITY")
-                                && let Some(args_root) = frame.body.get("args")
-                                && let Some(act_json) = args_root.get("activity")
-                                && let Ok(activity) =
-                                    serde_json::from_value::<Activity>(act_json.clone())
                             {
-                                let norm = activity.normalize();
-                                let pid = args_root
-                                    .get("pid")
-                                    .and_then(|p| p.as_u64())
-                                    .map(|p| p as u32);
-                                let nonce = frame.body.get("nonce").cloned();
-                                let out = json!({
-                                    "cmd":"DISPATCH",
-                                    "evt":"ACTIVITY_UPDATE",
-                                    "data": {"activity": norm},
-                                    "pid": pid,
-                                    "nonce": nonce,
-                                });
-                                let buf = encode_frame(IpcOp::Frame, &out);
-                                let _ = stream.write_all(&buf).await;
-                                bus.publish(EventKind::ActivityUpdate {
-                                    socket_id: socket_id.clone(),
-                                    payload: serde_json::to_value(norm).unwrap_or(json!({})),
-                                });
+                                // Validation
+                                if frame.body.get("args").is_none() {
+                                    let out = json!({"cmd":"SET_ACTIVITY","evt":"ERROR","data":{"code":4000,"message":"Invalid payload: missing args"}});
+                                    let _ = stream.write_all(&encode_frame(IpcOp::Frame, &out)).await;
+                                    continue;
+                                }
+                                let args_root = frame.body.get("args").unwrap();
+                                if let Some(btns) = args_root.get("activity").and_then(|a| a.get("buttons")).and_then(|b| b.as_array()) {
+                                    if btns.len() > 2 {
+                                        let out = json!({"cmd":"SET_ACTIVITY","evt":"ERROR","data":{"code":4002,"message":"Invalid payload: max 2 buttons"}});
+                                        let _ = stream.write_all(&encode_frame(IpcOp::Frame, &out)).await;
+                                        continue;
+                                    }
+                                }
+                                if let Some(act_json) = args_root.get("activity")
+                                    && let Ok(activity) = serde_json::from_value::<Activity>(act_json.clone())
+                                {
+                                    let norm = activity.normalize();
+                                    let pid = args_root
+                                        .get("pid")
+                                        .and_then(|p| p.as_u64())
+                                        .map(|p| p as u32);
+                                    let nonce = frame.body.get("nonce").cloned();
+                                    let out = json!({
+                                        "cmd":"DISPATCH",
+                                        "evt":"ACTIVITY_UPDATE",
+                                        "data": {"activity": norm},
+                                        "pid": pid,
+                                        "nonce": nonce,
+                                    });
+                                    let buf = encode_frame(IpcOp::Frame, &out);
+                                    let _ = stream.write_all(&buf).await;
+                                    bus.publish(EventKind::ActivityUpdate {
+                                        socket_id: socket_id.clone(),
+                                        payload: serde_json::to_value(norm).unwrap_or(json!({})),
+                                    });
+                                }
                             }
                         }
                         _ => {}
@@ -223,6 +238,7 @@ async fn handle_client_windows(
                     debug!("handshake accepted");
                     // respond with READY DISPATCH full payload
                     let ready_data = ReadyEvent {
+                        v: 1,
                         config: ReadyConfig::default(),
                         user: MockUser::default(),
                     };
@@ -458,5 +474,71 @@ mod tests {
             .and_then(|n| n.as_str())
             .unwrap_or("");
         assert_eq!(name, "TestGame");
+    }
+
+    #[tokio::test]
+    async fn set_activity_missing_args_errors() {
+        let test_dir = format!(
+            "/tmp/drpc-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        std::fs::create_dir_all(&test_dir).unwrap();
+        unsafe { std::env::set_var("XDG_RUNTIME_DIR", &test_dir); }
+        let server = IpcServer::bind_with_bus(drpc_core::EventBus::new()).await.expect("bind");
+        let path = server.path();
+        let mut client = tokio::net::UnixStream::connect(path).await.expect("connect");
+        // Handshake + read READY
+        let hs = serde_json::json!({"v":1,"client_id":"123"});
+        client.write_all(&encode_frame(IpcOp::Handshake, &hs)).await.unwrap();
+        let mut header = [0u8;8]; client.read_exact(&mut header).await.unwrap();
+        let len = i32::from_le_bytes(header[4..8].try_into().unwrap()) as usize; let mut body = vec![0u8;len]; client.read_exact(&mut body).await.unwrap();
+        // Send invalid SET_ACTIVITY (no args)
+        let set = serde_json::json!({"cmd":"SET_ACTIVITY"});
+        client.write_all(&encode_frame(IpcOp::Frame, &set)).await.unwrap();
+        // Read ERROR
+        let mut h2=[0u8;8]; client.read_exact(&mut h2).await.unwrap();
+        let l2=i32::from_le_bytes(h2[4..8].try_into().unwrap()) as usize; let mut b2=vec![0u8;l2]; client.read_exact(&mut b2).await.unwrap();
+        let mut f = Vec::from(h2); f.extend_from_slice(&b2);
+        let frame = decode_frame(&f).unwrap();
+        assert_eq!(frame.op as i32, IpcOp::Frame as i32);
+        assert_eq!(frame.body.get("evt").and_then(|e| e.as_str()), Some("ERROR"));
+        assert_eq!(frame.body.get("data").and_then(|d| d.get("code")).and_then(|c| c.as_i64()), Some(4000));
+    }
+
+    #[tokio::test]
+    async fn set_activity_buttons_over_limit_errors() {
+        let test_dir = format!(
+            "/tmp/drpc-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        std::fs::create_dir_all(&test_dir).unwrap();
+        unsafe { std::env::set_var("XDG_RUNTIME_DIR", &test_dir); }
+        let server = IpcServer::bind_with_bus(drpc_core::EventBus::new()).await.expect("bind");
+        let path = server.path();
+        let mut client = tokio::net::UnixStream::connect(path).await.expect("connect");
+        // Handshake + read READY
+        let hs = serde_json::json!({"v":1,"client_id":"123"});
+        client.write_all(&encode_frame(IpcOp::Handshake, &hs)).await.unwrap();
+        let mut header = [0u8;8]; client.read_exact(&mut header).await.unwrap();
+        let len = i32::from_le_bytes(header[4..8].try_into().unwrap()) as usize; let mut body = vec![0u8;len]; client.read_exact(&mut body).await.unwrap();
+        // Send SET_ACTIVITY with >2 buttons
+        let set = serde_json::json!({
+            "cmd":"SET_ACTIVITY",
+            "args": {"activity": {"name": "Bad","buttons":[{"label":"l1","url":"u1"},{"label":"l2","url":"u2"},{"label":"l3","url":"u3"}]}}
+        });
+        client.write_all(&encode_frame(IpcOp::Frame, &set)).await.unwrap();
+        // Read ERROR
+        let mut h2=[0u8;8]; client.read_exact(&mut h2).await.unwrap();
+        let l2=i32::from_le_bytes(h2[4..8].try_into().unwrap()) as usize; let mut b2=vec![0u8;l2]; client.read_exact(&mut b2).await.unwrap();
+        let mut f = Vec::from(h2); f.extend_from_slice(&b2);
+        let frame = decode_frame(&f).unwrap();
+        assert_eq!(frame.body.get("evt").and_then(|e| e.as_str()), Some("ERROR"));
+        assert_eq!(frame.body.get("data").and_then(|d| d.get("code")).and_then(|c| c.as_i64()), Some(4002));
     }
 }
