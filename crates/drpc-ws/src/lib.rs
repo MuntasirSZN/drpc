@@ -85,6 +85,7 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
     let span = info_span!("ws_connection", %socket_id);
     let _enter = span.enter();
     let ready = ReadyEvent {
+        v: 1,
         config: ReadyConfig::default(),
         user: MockUser::default(),
     };
@@ -171,26 +172,31 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                     continue;
                 }
                 if maybe_cmd == "CONNECTIONS_CALLBACK" {
-                    let out = json!({"cmd":"DISPATCH","evt":"ERROR","data":{"code":1000}});
-                    let _ = socket.send(Message::Text(out.to_string().into())).await;
+                    let nonce = val.get("nonce").cloned();
+                    let out = json!({
+                        "cmd": "CONNECTIONS_CALLBACK",
+                        "evt": "ERROR",
+                        "data": {"code": 1000, "message": "Connections callback not supported"},
+                        "nonce": nonce,
+                    });
+                    let _ = send_json_or_etf(&mut socket, &out, use_etf).await;
                     continue;
                 }
-                if matches!(
-                    maybe_cmd.as_str(),
-                    "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK"
-                ) {
-                    let out = json!({"cmd":"DISPATCH","evt":"ACK","data":{"ok":true}});
-                    let _ = socket.send(Message::Text(out.to_string().into())).await;
+                if matches!(maybe_cmd.as_str(), "INVITE_BROWSER" | "GUILD_TEMPLATE_BROWSER" | "DEEP_LINK") {
+                    let nonce = val.get("nonce").cloned();
+                    let out = json!({"cmd": maybe_cmd, "evt":"ACK","data":{"ok":true}, "nonce": nonce});
+                    let _ = send_json_or_etf(&mut socket, &out, use_etf).await;
                     continue;
                 }
-                let out = json!({"cmd":"DISPATCH","evt":"ACK","data":val});
-                if socket
-                    .send(Message::Text(out.to_string().into()))
-                    .await
-                    .is_err()
-                {
-                    break;
-                }
+                // Unknown command -> ERROR
+                let nonce = val.get("nonce").cloned();
+                let err = json!({
+                    "cmd": maybe_cmd,
+                    "evt": "ERROR",
+                    "data": {"code": 4000, "message": "Unknown command"},
+                    "nonce": nonce,
+                });
+                let _ = send_json_or_etf(&mut socket, &err, use_etf).await;
             }
             Message::Close(c) => {
                 debug!(?c, "close");
