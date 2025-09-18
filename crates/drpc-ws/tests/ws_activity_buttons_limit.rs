@@ -1,6 +1,6 @@
 use futures::{SinkExt, StreamExt};
-use tokio_tungstenite::connect_async;
 use serde_json::Value;
+use tokio_tungstenite::connect_async;
 
 #[tokio::test]
 async fn ws_set_activity_buttons_over_limit_errors() {
@@ -27,14 +27,18 @@ async fn ws_set_activity_buttons_over_limit_errors() {
             ]
         }}
     });
-    ws.send(tokio_tungstenite::tungstenite::Message::Text(payload.to_string().into()))
-        .await
-        .unwrap();
+    ws.send(tokio_tungstenite::tungstenite::Message::Text(
+        payload.to_string().into(),
+    ))
+    .await
+    .unwrap();
     let resp = ws.next().await.expect("resp").expect("ok");
-    let txt = match resp { tokio_tungstenite::tungstenite::Message::Text(t) => t, other => panic!("expected text got {other:?}") };
+    let txt = match resp {
+        tokio_tungstenite::tungstenite::Message::Text(t) => t,
+        other => panic!("expected text got {other:?}"),
+    };
     let v: Value = serde_json::from_str(&txt).unwrap();
     assert_eq!(v["evt"].as_str(), Some("ERROR"));
     assert_eq!(v["cmd"].as_str(), Some("SET_ACTIVITY"));
     assert_eq!(v["data"]["code"].as_u64(), Some(4002));
 }
-
