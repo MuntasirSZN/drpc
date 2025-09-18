@@ -47,6 +47,7 @@ pub struct OutgoingFrame {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadyEvent {
+    pub v: u8,
     pub config: ReadyConfig,
     pub user: MockUser,
 }
@@ -62,7 +63,7 @@ impl Default for ReadyConfig {
     fn default() -> Self {
         Self {
             cdn_host: "cdn.discordapp.com".into(),
-            api_endpoint: "https://discord.com/api".into(),
+            api_endpoint: "//discord.com/api".into(),
             environment: "production".into(),
         }
     }

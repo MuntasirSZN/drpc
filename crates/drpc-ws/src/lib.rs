@@ -189,7 +189,26 @@ async fn handle_socket(mut socket: WebSocket, bus: EventBus, use_etf: bool) {
                 }
                 if matches!(maybe_cmd.as_str(), "SUBSCRIBE" | "UNSUBSCRIBE") {
                     let nonce = val.get("nonce").cloned();
-                    let ack = json!({"cmd":"DISPATCH","evt":"ACK","data":{},"nonce":nonce});
+                    let evt_name = val.get("args").and_then(|a| a.get("event")).and_then(|e| e.as_str());
+                    if evt_name.is_none() {
+                        let err = json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Invalid payload: missing args.event"}, "nonce": nonce});
+                        let _ = send_json_or_etf(&mut socket, &err, use_etf).await;
+                        continue;
+                    }
+                    // Minimal validation: allow known events else error
+                    let allowed = matches!(evt_name.unwrap(),
+                        "GUILD_STATUS" | "GUILD_CREATE" | "CHANNEL_CREATE" |
+                        "VOICE_CHANNEL_SELECT" | "VOICE_STATE_CREATE" | "VOICE_STATE_UPDATE" |
+                        "VOICE_STATE_DELETE" | "VOICE_SETTINGS_UPDATE" | "VOICE_CONNECTION_STATUS" |
+                        "SPEAKING_START" | "SPEAKING_STOP" | "MESSAGE_CREATE" | "MESSAGE_UPDATE" |
+                        "MESSAGE_DELETE" | "NOTIFICATION_CREATE" | "ACTIVITY_JOIN" | "ACTIVITY_SPECTATE" |
+                        "ACTIVITY_JOIN_REQUEST");
+                    if !allowed {
+                        let err = json!({"cmd": maybe_cmd, "evt":"ERROR","data":{"code":4000, "message":"Invalid payload: unknown event"}, "nonce": nonce});
+                        let _ = send_json_or_etf(&mut socket, &err, use_etf).await;
+                        continue;
+                    }
+                    let ack = json!({"cmd": maybe_cmd, "evt":"ACK","data":{},"nonce":nonce});
                     let _ = send_json_or_etf(&mut socket, &ack, use_etf).await;
                     continue;
                 }
@@ -460,17 +479,58 @@ async fn send_json_or_etf(
 
 // Validate activity payload per docs (partial): max 2 buttons
 fn validate_activity_payload(raw: &serde_json::Value) -> Option<serde_json::Value> {
-    let args = raw.get("args")?;
-    let act = args.get("activity")?;
+    let nonce = raw.get("nonce").cloned();
+    let args = match raw.get("args") {
+        Some(a) => a,
+        None => {
+            return Some(json!({
+                "cmd": "SET_ACTIVITY",
+                "evt": "ERROR",
+                "data": {"code": 4000, "message": "Invalid payload: missing args"},
+                "nonce": nonce,
+            }))
+        }
+    };
+    let act = match args.get("activity") {
+        Some(a) => a,
+        None => {
+            return Some(json!({
+                "cmd": "SET_ACTIVITY",
+                "evt": "ERROR",
+                "data": {"code": 4000, "message": "Invalid payload: missing activity"},
+                "nonce": nonce,
+            }))
+        }
+    };
+    if !act.is_object() {
+        return Some(json!({
+            "cmd": "SET_ACTIVITY",
+            "evt": "ERROR",
+            "data": {"code": 4000, "message": "Invalid payload: activity must be object"},
+            "nonce": nonce,
+        }));
+    }
     if let Some(btns) = act.get("buttons").and_then(|b| b.as_array()) {
         if btns.len() > 2 {
-            let nonce = raw.get("nonce").cloned();
             return Some(json!({
                 "cmd": "SET_ACTIVITY",
                 "evt": "ERROR",
                 "data": {"code": 4002, "message": "Invalid payload: max 2 buttons"},
                 "nonce": nonce,
             }));
+        }
+        // ensure each button has string label/url
+        for b in btns {
+            let label_ok = b.get("label").and_then(|v| v.as_str()).is_some();
+            let url_ok = b.get("url").and_then(|v| v.as_str()).is_some();
+            if !label_ok || !url_ok {
+                return Some(json!({
+                    "cmd": "SET_ACTIVITY",
+                    "evt": "ERROR",
+                    "data": {"code": 4000, "message": "Invalid payload: button requires label and url strings"},
+                    "nonce": nonce,
+                }));
+            }
         }
     }
     None
